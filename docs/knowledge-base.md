@@ -15,6 +15,7 @@ Never record an unconfirmed assumption here as a fact.
 ## Feature map
 
 **Core features**
+
 - Household and membership
 - Expenses
 - Equal, percentage, and custom splits
@@ -34,19 +35,20 @@ Never record an unconfirmed assumption here as a fact.
 
 **Palette**
 
-| Role | Colour |
-|---|---|
-| Primary | `#4F7CAC` |
-| Secondary | `#7FB069` |
-| Accent | `#F4A259` |
+| Role            | Colour    |
+| --------------- | --------- |
+| Primary         | `#4F7CAC` |
+| Secondary       | `#7FB069` |
+| Accent          | `#F4A259` |
 | Page background | `#FAF8F5` |
-| Surfaces | `#FFFFFF` |
-| Main text | `#2D3748` |
-| Success | `#22C55E` |
-| Warning | `#F59E0B` |
-| Danger | `#EF4444` |
+| Surfaces        | `#FFFFFF` |
+| Main text       | `#2D3748` |
+| Success         | `#22C55E` |
+| Warning         | `#F59E0B` |
+| Danger          | `#EF4444` |
 
 **Rules**
+
 - These colours are for fills, icons, and large text.
 - Body-size text needs darker shades so it meets WCAG AA (D16).
 - **Font:** Plus Jakarta Sans (F1).
@@ -78,22 +80,41 @@ Never record an unconfirmed assumption here as a fact.
 
 ## Repository facts
 
-Last verified: 2026-11-02, after Phase 1. Planned items are marked **(planned)** until Phase 2 verifies them.
+Last verified: 2026-11-03, after Phase 2.
 
-- **Framework/version:** none yet. Next.js App Router + TypeScript **(planned, A1)**.
-- **Package manager and lockfile:** npm **(planned, A2)**. No lockfile yet.
-- **Main source directory:** none yet.
-- **Route structure:** none yet.
-- **Database/auth provider:** Supabase **(planned, A3/A4)**. Not configured.
+**Stack**
+
+- **Framework/version:** Next.js 16.4.4 (App Router, Turbopack), React 19.3.0, TypeScript 5.9 (strict). `cacheComponents` and `partialPrefetching` are enabled.
+- **Package manager and lockfile:** npm 10.9, with `package-lock.json`. Node 22.
+- **Main source directory:** `src/`, with the `@/*` alias.
+- **UI library and design tokens:**
+  - Tailwind CSS 4.3, shadcn/ui (Radix base, `nova` preset), lucide icons.
+  - Tokens are in `src/app/globals.css`.
+  - See [design-system.md](design-system.md).
+
+**Routes**
+
+- `/`: placeholder home page.
+- `/dev/design-system`: development only; returns 404 in production.
+
+**Data**
+
+- **Database/auth provider:** Supabase (A3/A4) is planned but not configured yet.
 - **Schema/migration location:** none yet.
-- **UI library and design tokens:** Tailwind + shadcn/ui **(planned, A5)**. No tokens yet.
-- **Test/lint/typecheck/build commands:** none yet.
-- **Implemented features:** none.
-- **Known blockers:**
-  - The Supabase CLI is not installed. It will be added as a dev dependency (A4).
-  - `npx --version` produced unexpected output and needs a check.
+
+**Commands**
+
+- `npm run dev`, `build`, `lint`, `typecheck`, `test` (Vitest), `format`, `format:check`.
+
+**Status**
+
+- **Implemented features:** the UI foundation only (design tokens, typography, shared components). No product features yet.
+- **Known blockers:** the Supabase CLI isn't installed yet. It will be added as a dev dependency in Phase 4 (A4).
+- **Resolved:**
+  - `npx` works.
+  - The odd output in Phase 0 came from the version-check loop, not from npx.
 - **Deployment target:** Open (O1).
-- **Environment variable names:** none defined yet. They will be listed in `.env.example`.
+- **Environment variable names:** none yet. `.env.example` exists, and Supabase names will be added in Phase 4 (O4).
 - **Git:** `main` tracks `origin/main` (`github.com/Devyansh1103/Shared-Household-Journal`).
 
 ## Decisions

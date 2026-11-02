@@ -9,49 +9,49 @@
 
 ## A. Repository snapshot
 
-| Item | Finding |
-|---|---|
-| Directory | `D:\RoomMate` |
-| Git | Branch `main`, up to date with `origin/main`, working tree clean |
-| Remote | `github.com/Devyansh1103/Shared-Household-Journal` |
-| History | 1 commit, `c799c9d` "Project Files", author Devyansh1103 |
-| Tracked files | `Roommate_PRD.pdf`, `Roommate_TRD.pdf`, `roommate_knowledgebase.pdf` |
-| Git hooks | None active (only the default `.sample` files) |
-| `.gitignore` | Not present |
+| Item             | Finding                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| Directory        | `D:\RoomMate`                                                                         |
+| Git              | Branch `main`, up to date with `origin/main`, working tree clean                      |
+| Remote           | `github.com/Devyansh1103/Shared-Household-Journal`                                    |
+| History          | 1 commit, `c799c9d` "Project Files", author Devyansh1103                              |
+| Tracked files    | `Roommate_PRD.pdf`, `Roommate_TRD.pdf`, `roommate_knowledgebase.pdf`                  |
+| Git hooks        | None active (only the default `.sample` files)                                        |
+| `.gitignore`     | Not present                                                                           |
 | Technology stack | Unknown / not present. No `package.json`, lockfile, source, config, schema, or tests. |
 
 Tools on the machine (checked with `--version` only; not repository facts):
 
-| Tool | Result |
-|---|---|
-| git | 2.51.0 |
-| Node | v22.18.0 |
-| npm | 10.9.3 |
-| Docker | 27.5.1 |
-| pnpm, yarn, bun | Not found |
-| Supabase CLI | Not found |
-| npx | Gave unexpected output; needs a manual check |
+| Tool            | Result                                       |
+| --------------- | -------------------------------------------- |
+| git             | 2.51.0                                       |
+| Node            | v22.18.0                                     |
+| npm             | 10.9.3                                       |
+| Docker          | 27.5.1                                       |
+| pnpm, yarn, bun | Not found                                    |
+| Supabase CLI    | Not found                                    |
+| npx             | Gave unexpected output; needs a manual check |
 
 ## B. Feature inventory
 
-| # | Area | Status | Evidence |
-|---|---|---|---|
-| 1 | Authentication and profiles | Not found | No source files |
-| 2 | Household creation and membership | Not found | — |
-| 3 | Invitations | Not found | — |
-| 4 | Expense creation and editing | Not found | — |
-| 5–7 | Equal, percentage, custom splits | Not found | — |
-| 8 | Balances | Not found | — |
-| 9 | Settlements | Not found | — |
-| 10 | Activity journal | Not found | — |
-| 11 | Recurring bills | Not found | — |
-| 12 | Shopping list | Not found | — |
-| 13 | Chores | Not found | — |
-| 14 | Budgets and analytics | Not found | — |
-| 15 | Notifications | Not found | — |
-| 16 | Responsive design | Not found | — |
-| 17 | Accessibility | Not found | — |
-| 18 | Security and household access control | Not found | — |
+| #   | Area                                  | Status    | Evidence        |
+| --- | ------------------------------------- | --------- | --------------- |
+| 1   | Authentication and profiles           | Not found | No source files |
+| 2   | Household creation and membership     | Not found | —               |
+| 3   | Invitations                           | Not found | —               |
+| 4   | Expense creation and editing          | Not found | —               |
+| 5–7 | Equal, percentage, custom splits      | Not found | —               |
+| 8   | Balances                              | Not found | —               |
+| 9   | Settlements                           | Not found | —               |
+| 10  | Activity journal                      | Not found | —               |
+| 11  | Recurring bills                       | Not found | —               |
+| 12  | Shopping list                         | Not found | —               |
+| 13  | Chores                                | Not found | —               |
+| 14  | Budgets and analytics                 | Not found | —               |
+| 15  | Notifications                         | Not found | —               |
+| 16  | Responsive design                     | Not found | —               |
+| 17  | Accessibility                         | Not found | —               |
+| 18  | Security and household access control | Not found | —               |
 
 No tests exist for any area. Requirements exist only in the PDFs.
 
@@ -67,13 +67,13 @@ No tests exist for any area. Requirements exist only in the PDFs.
 - **Available scripts:** none (no `package.json`).
 - **Commands run (all read-only):**
 
-| Command | Result |
-|---|---|
-| `git status` | Clean, on `main` |
-| `git log --all`, `git branch -a`, `git ls-files` | 1 commit, 1 branch, 3 PDFs |
-| `git remote -v` | Output masked for credentials; the URL contains none |
-| Listing of hidden folders and active hooks | No active hooks |
-| `--version` checks for git, node, npm, pnpm, yarn, bun, npx, supabase, docker | As in section A |
+| Command                                                                       | Result                                               |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `git status`                                                                  | Clean, on `main`                                     |
+| `git log --all`, `git branch -a`, `git ls-files`                              | 1 commit, 1 branch, 3 PDFs                           |
+| `git remote -v`                                                               | Output masked for credentials; the URL contains none |
+| Listing of hidden folders and active hooks                                    | No active hooks                                      |
+| `--version` checks for git, node, npm, pnpm, yarn, bun, npx, supabase, docker | As in section A                                      |
 
 - **Not run:** unit tests, end-to-end tests, lint, typecheck, build, database type generation, RLS checks. None of them exist.
 
@@ -99,16 +99,16 @@ No tests exist for any area. Requirements exist only in the PDFs.
 
 ## F. Risk register
 
-| Severity | Risk | Evidence | Why it matters | Phase | Owner approval? |
-|---|---|---|---|---|---|
-| High | No `.gitignore` | Repo root | Once the project is created, `.env*`, `node_modules`, and build output could be pushed to GitHub | Project setup | No (standard practice) |
-| High | Money decisions still open | PRD §11, TRD §12 | Currency and rounding shape the expense and split tables; changing them later means migrating stored data | Before expenses | Yes |
-| Medium | Stack not confirmed | No `package.json` | Next.js, Supabase, and Tailwind are only recommended | Setup | Yes |
-| Medium | Supabase CLI not installed | Version check | Needed for migrations, generated types, and local RLS testing | Before database work | Yes |
-| Medium | Coding tools add AI co-author lines to commits by default | Tool default behaviour | Conflicts with the owner's rule that commits carry no AI attribution | Now | Handled outside the repo |
-| Low | Knowledge Base is a PDF | Repo root | Can't keep the decision log updated as the documents require | Phase 1 | No |
-| Low | Repository visibility unknown | — | If the repo is public, the planning documents are public | — | Owner's choice |
-| Low | `npx --version` gave odd output | Version check | Could affect scaffolding commands | Setup | No |
+| Severity | Risk                                                      | Evidence               | Why it matters                                                                                            | Phase                | Owner approval?          |
+| -------- | --------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------ |
+| High     | No `.gitignore`                                           | Repo root              | Once the project is created, `.env*`, `node_modules`, and build output could be pushed to GitHub          | Project setup        | No (standard practice)   |
+| High     | Money decisions still open                                | PRD §11, TRD §12       | Currency and rounding shape the expense and split tables; changing them later means migrating stored data | Before expenses      | Yes                      |
+| Medium   | Stack not confirmed                                       | No `package.json`      | Next.js, Supabase, and Tailwind are only recommended                                                      | Setup                | Yes                      |
+| Medium   | Supabase CLI not installed                                | Version check          | Needed for migrations, generated types, and local RLS testing                                             | Before database work | Yes                      |
+| Medium   | Coding tools add AI co-author lines to commits by default | Tool default behaviour | Conflicts with the owner's rule that commits carry no AI attribution                                      | Now                  | Handled outside the repo |
+| Low      | Knowledge Base is a PDF                                   | Repo root              | Can't keep the decision log updated as the documents require                                              | Phase 1              | No                       |
+| Low      | Repository visibility unknown                             | —                      | If the repo is public, the planning documents are public                                                  | —                    | Owner's choice           |
+| Low      | `npx --version` gave odd output                           | Version check          | Could affect scaffolding commands                                                                         | Setup                | No                       |
 
 ## G. Verified project baseline
 

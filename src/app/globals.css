@@ -1,0 +1,263 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Light mode only (D19). Keeping a class-based dark variant stops the
+   components' `dark:` styles from following the OS colour scheme. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens — see docs/design-system.md.
+ * Every colour is a hex value in :root so src/app/tokens.test.ts can verify
+ * WCAG contrast. Brand colours from the PRD are kept for fills and icons;
+ * text and white-on-fill use the darker "-strong" shades (D16).
+ */
+:root {
+  /* PRD brand palette (fills, icons, illustration — not body text) */
+  --brand-primary: #4f7cac;
+  --brand-secondary: #7fb069;
+  --brand-accent: #f4a259;
+
+  /* Surfaces and text */
+  --background: #faf8f5;
+  --foreground: #2d3748;
+  --card: #ffffff;
+  --card-foreground: #2d3748;
+  --popover: #ffffff;
+  --popover-foreground: #2d3748;
+  --muted: #f3f0eb;
+  --muted-foreground: #5b6474;
+  /* shadcn "accent" = hover/selected background for menu items */
+  --accent: #f1ede6;
+  --accent-foreground: #2d3748;
+
+  /* Actions */
+  --primary: #3f6a99;
+  --primary-hover: #345a84;
+  --primary-foreground: #ffffff;
+  --secondary: #eef5e9;
+  --secondary-foreground: #44722f;
+  --secondary-hover: #e1edd8;
+  --destructive: #c53030;
+  --destructive-hover: #a82828;
+  --destructive-foreground: #ffffff;
+  --destructive-subtle: #fdecec;
+
+  /* Brand accent (apricot) for highlights; named to avoid shadcn's "accent" */
+  --highlight: #f4a259;
+  --highlight-subtle: #fdf1e6;
+  --highlight-foreground: #9a5212;
+
+  /* Status: "-subtle" backgrounds with accessible text colours */
+  --success: #15803d;
+  --success-fill: #22c55e;
+  --success-subtle: #eaf7ee;
+  --warning: #b45309;
+  --warning-fill: #f59e0b;
+  --warning-subtle: #fef4e2;
+  --info: #3f6a99;
+  --info-subtle: #eaf1f8;
+
+  /* Lines and focus */
+  --border: #e6e1d9;
+  --input: #857f76;
+  --ring: #4f7cac;
+
+  /* Charts (validated against data-viz guidance in Phase 16) */
+  --chart-1: #4f7cac;
+  --chart-2: #7fb069;
+  --chart-3: #f4a259;
+  --chart-4: #5b6474;
+  --chart-5: #b9a88f;
+
+  /* Sidebar (used by the Phase 3 shell) */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #2d3748;
+  --sidebar-primary: #3f6a99;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaf1f8;
+  --sidebar-accent-foreground: #2d3748;
+  --sidebar-border: #e6e1d9;
+  --sidebar-ring: #4f7cac;
+
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-accent: var(--brand-accent);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-destructive: var(--destructive);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-highlight: var(--highlight);
+  --color-highlight-subtle: var(--highlight-subtle);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-success: var(--success);
+  --color-success-fill: var(--success-fill);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-fill: var(--warning-fill);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@theme {
+  /* max-w-page / max-w-prose-narrow */
+  --container-page: 72rem;
+  --container-prose-narrow: 42rem;
+
+  --shadow-card: 0 1px 2px rgb(45 55 72 / 0.06), 0 1px 3px rgb(45 55 72 / 0.04);
+  --shadow-raised:
+    0 4px 12px rgb(45 55 72 / 0.08), 0 1px 3px rgb(45 55 72 / 0.06);
+}
+
+/* Typography roles. Prefixed "type-" (not "text-") so class merging never
+   mistakes them for Tailwind colour or size utilities. */
+@utility type-page-title {
+  font-family: var(--font-heading);
+  font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+@utility type-section-title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+@utility type-card-title {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@utility type-body {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+@utility type-secondary {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+@utility type-label {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+@utility type-help {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+@utility type-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@utility type-amount-lg {
+  font-family: var(--font-heading);
+  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+  line-height: 1.15;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+@utility type-timestamp {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Elements that don't draw their own focus ring (links, summaries, custom
+     focus targets) still get a visible, high-contrast outline. */
+  :where(a, summary, [tabindex]):focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
