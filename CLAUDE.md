@@ -44,9 +44,12 @@ Records shared household expenses and home coordination. **The app never moves m
 - Light mode only.
 - Formatting locale: `en-IN`.
 
-**Data (planned, not built yet)**
+**Data**
 
-- Supabase: Postgres, Auth, RLS, with atomic Postgres functions for money writes (Phase 4 onwards).
+- Supabase: Postgres, Auth, RLS, with atomic Postgres functions for money writes. Local only, in Docker.
+- Migrations in `supabase/migrations/`; schema and access rules in [docs/database.md](docs/database.md).
+- RLS helpers live in the unexposed `private` schema. Regenerate types with `npm run db:types` after a migration.
+- `npm run test:db` runs RLS tests against the local stack (`npm run db:start`); they are not part of `npm test`.
 
 ## Rules
 

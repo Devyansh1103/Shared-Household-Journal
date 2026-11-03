@@ -44,13 +44,14 @@ All Confirmed entries below were approved by the project owner on **2026-11-02**
 
 ## Open items
 
-| ID  | Item                                                                                                           | Status   | Needed by |
-| --- | -------------------------------------------------------------------------------------------------------------- | -------- | --------- |
-| O1  | Production hosting. Vercel + hosted Supabase is suggested.                                                     | Open     | Phase 18  |
-| O2  | Data-retention periods                                                                                         | Open     | Phase 18  |
-| O3  | Who may edit budgets. Proposed: owner only.                                                                    | Proposed | Phase 16  |
-| O4  | Exact Supabase public-key variable name ("anon" vs "publishable" key naming). Confirm when Supabase is set up. | Open     | Phase 4   |
-| O5  | Whether React Hook Form is needed for the split editor                                                         | Open     | Phase 8   |
+| ID  | Item                                                                                                                                                                                                                                      | Status   | Needed by |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------- |
+| O1  | Production hosting. Vercel + hosted Supabase is suggested.                                                                                                                                                                                | Open     | Phase 18  |
+| O2  | Data-retention periods                                                                                                                                                                                                                    | Open     | Phase 18  |
+| O3  | Who may edit budgets. Proposed: owner only.                                                                                                                                                                                               | Proposed | Phase 16  |
+| O4  | Exact Supabase public-key variable name ("anon" vs "publishable" key naming). Confirm when Supabase is set up. Phase 4 did not need it: the RLS tests read local keys from `supabase status` at runtime. Supabase CLI 3.0.0 is installed. | Open     | Phase 5   |
+| O5  | Whether React Hook Form is needed for the split editor                                                                                                                                                                                    | Open     | Phase 8   |
+| O6  | D5 says invites default to 7 days and 10 uses. Are those also maximums a member cannot exceed? The database currently enforces only `max_uses > 0` and expiry after creation.                                                             | Open     | Phase 6   |
 
 ## Details
 

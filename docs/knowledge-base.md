@@ -80,7 +80,7 @@ Never record an unconfirmed assumption here as a fact.
 
 ## Repository facts
 
-Last verified: 2026-11-03, after Phase 2.
+Last verified: 2026-11-03, after Phase 4.
 
 **Stack**
 
@@ -99,22 +99,24 @@ Last verified: 2026-11-03, after Phase 2.
 
 **Data**
 
-- **Database/auth provider:** Supabase (A3/A4) is planned but not configured yet.
-- **Schema/migration location:** none yet.
+- **Database/auth provider:** Supabase, local only (Docker, Postgres 17). Supabase CLI 3.0.0 is a dev dependency; `@supabase/supabase-js` 2.118 is installed. No hosted project is linked (O1).
+- **Schema/migration location:** [supabase/migrations/](../supabase/migrations/). Phase 4 tables: `profiles`, `households`, `household_members`, `invitations`. See [database.md](database.md).
+- **Generated types:** `src/lib/supabase/database.types.ts` (`npm run db:types`).
 
 **Commands**
 
 - `npm run dev`, `build`, `lint`, `typecheck`, `test` (Vitest), `format`, `format:check`.
+- `npm run db:start`, `db:stop`, `db:status`, `db:types`, `test:db` (RLS tests; need the local stack).
 
 **Status**
 
-- **Implemented features:** the UI foundation only (design tokens, typography, shared components). No product features yet.
-- **Known blockers:** the Supabase CLI isn't installed yet. It will be added as a dev dependency in Phase 4 (A4).
+- **Implemented features:** the UI foundation (design tokens, typography, shared components) and the Phase 4 database foundation (core tables, RLS, tests). No product features yet.
+- **Not done:** Phase 3 (application shell) has not been built.
 - **Resolved:**
   - `npx` works.
   - The odd output in Phase 0 came from the version-check loop, not from npx.
 - **Deployment target:** Open (O1).
-- **Environment variable names:** none yet. `.env.example` exists, and Supabase names will be added in Phase 4 (O4).
+- **Environment variable names:** none yet. The app's Supabase names are added in Phase 5 (O4). The database tests read local keys from `supabase status` and need no variables.
 - **Git:** `main` tracks `origin/main` (`github.com/Devyansh1103/Shared-Household-Journal`).
 
 ## Decisions
