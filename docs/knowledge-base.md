@@ -80,7 +80,7 @@ Never record an unconfirmed assumption here as a fact.
 
 ## Repository facts
 
-Last verified: 2026-11-03, after Phase 4.
+Last verified: 2026-11-04, after Phase 5.
 
 **Stack**
 
@@ -94,29 +94,31 @@ Last verified: 2026-11-03, after Phase 4.
 
 **Routes**
 
-- `/`: placeholder home page.
+- `/`: public landing page with sign-up and sign-in links.
+- `/sign-in`, `/sign-up`, `/forgot-password`, `/auth/confirm`: public auth routes.
+- `/home`, `/profile`, `/reset-password`: signed-in routes (`(app)` group). See [auth.md](auth.md).
 - `/dev/design-system`: development only; returns 404 in production.
 
 **Data**
 
-- **Database/auth provider:** Supabase, local only (Docker, Postgres 17). Supabase CLI 3.0.0 is a dev dependency; `@supabase/supabase-js` 2.118 is installed. No hosted project is linked (O1).
+- **Database/auth provider:** Supabase, local only (Docker, Postgres 17, Auth with email confirmation and Mailpit). Supabase CLI 3.0.0 is a dev dependency; `@supabase/supabase-js` 2.118, `@supabase/ssr` 0.12 and `zod` 4.6 are installed. No hosted project is linked (O1).
 - **Schema/migration location:** [supabase/migrations/](../supabase/migrations/). Phase 4 tables: `profiles`, `households`, `household_members`, `invitations`. See [database.md](database.md).
 - **Generated types:** `src/lib/supabase/database.types.ts` (`npm run db:types`).
 
 **Commands**
 
 - `npm run dev`, `build`, `lint`, `typecheck`, `test` (Vitest), `format`, `format:check`.
-- `npm run db:start`, `db:stop`, `db:status`, `db:types`, `test:db` (RLS tests; need the local stack).
+- `npm run db:start`, `db:stop`, `db:status`, `db:types`, `test:db` (RLS and Auth tests; need the local stack).
 
 **Status**
 
-- **Implemented features:** the UI foundation (design tokens, typography, shared components) and the Phase 4 database foundation (core tables, RLS, tests). No product features yet.
-- **Not done:** Phase 3 (application shell) has not been built.
+- **Implemented features:** the UI foundation, the Phase 4 database foundation, and Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing).
+- **Not done:** Phase 3 (application shell). A minimal signed-in header stands in for it.
 - **Resolved:**
   - `npx` works.
   - The odd output in Phase 0 came from the version-check loop, not from npx.
 - **Deployment target:** Open (O1).
-- **Environment variable names:** none yet. The app's Supabase names are added in Phase 5 (O4). The database tests read local keys from `supabase status` and need no variables.
+- **Environment variable names:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (O4), documented in `.env.example`. The database tests read local keys from `supabase status` and need no variables.
 - **Git:** `main` tracks `origin/main` (`github.com/Devyansh1103/Shared-Household-Journal`).
 
 ## Decisions

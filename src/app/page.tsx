@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { HouseIcon } from "lucide-react";
 import { PageContainer } from "@/components/layout/page-container";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -19,10 +20,14 @@ export default function Home() {
             costs, bills, chores and the shopping list — so everyone can see how
             things stand.
           </p>
-          <p className="type-secondary">
-            We&apos;re still setting things up. Signing in and households are
-            coming next.
-          </p>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Button asChild size="lg">
+              <Link href="/sign-up">Create an account</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/sign-in">Sign in</Link>
+            </Button>
+          </div>
           {process.env.NODE_ENV !== "production" ? (
             <p className="type-secondary">
               <Link

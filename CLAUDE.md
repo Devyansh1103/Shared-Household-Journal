@@ -49,7 +49,13 @@ Records shared household expenses and home coordination. **The app never moves m
 - Supabase: Postgres, Auth, RLS, with atomic Postgres functions for money writes. Local only, in Docker.
 - Migrations in `supabase/migrations/`; schema and access rules in [docs/database.md](docs/database.md).
 - RLS helpers live in the unexposed `private` schema. Regenerate types with `npm run db:types` after a migration.
-- `npm run test:db` runs RLS tests against the local stack (`npm run db:start`); they are not part of `npm test`.
+- `npm run test:db` runs RLS and Auth tests against the local stack (`npm run db:start`); they are not part of `npm test`.
+
+**Auth** ([docs/auth.md](docs/auth.md))
+
+- Supabase Auth, email and password, with cookie sessions via `@supabase/ssr`. Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- `src/proxy.ts` only refreshes the session. Check the user with `requireUser()` from `src/lib/auth/session.ts` in every protected page, layout and Server Action.
+- Session reads need a `<Suspense>` boundary (`cacheComponents`). Validate Server Action input with Zod; take user ids from the session, never from the form.
 
 ## Rules
 

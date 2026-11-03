@@ -83,7 +83,7 @@ Every table has a uuid `id`, `created_at`, and `updated_at` where relevant.
 4. **Owner-only actions** are enforced in policies and functions, not just hidden in the UI.
 5. **Invite tokens:** 32 random bytes, stored only as a SHA-256 hash. Expiry, use limit, and revocation are checked in a single transaction.
 6. **Input validation:** Zod at the Server Action boundary, plus database constraints.
-7. **Keys:** only the Supabase URL and public key are sent to the browser. The service-role key is never exposed to the client and is not used for normal requests. `.env*` files are gitignored; only `.env.example` is committed. The exact variable name for the public key is Open (O4).
+7. **Keys:** only the Supabase URL and publishable key (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, O4) are sent to the browser. The service-role key is never exposed to the client and is not used for normal requests. `.env*` files are gitignored; only `.env.example` is committed.
 8. **Auth checks:** sessions are checked on the server. Middleware only refreshes sessions and never makes authorization decisions.
 9. **Tests:** two households and three users. Cross-household select, insert, update, and delete must be denied on every table, and removed members must lose access ([ADR-012](adr/012-testing.md)).
 
@@ -108,5 +108,5 @@ Resolved in [decisions.md](decisions.md), except:
 - O1: hosting
 - O2: data retention
 - O3: budget edit permission
-- O4: Supabase key naming
 - O5: React Hook Form
+- O6: invite expiry and use caps

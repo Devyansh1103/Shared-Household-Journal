@@ -8,7 +8,12 @@ import type { Database } from "@/lib/supabase/database.types";
 
 export type TypedClient = SupabaseClient<Database>;
 
-type LocalStatus = { url: string; publicKey: string; serviceRoleKey: string };
+type LocalStatus = {
+  url: string;
+  publicKey: string;
+  serviceRoleKey: string;
+  mailpitUrl?: string;
+};
 
 let status: LocalStatus | undefined;
 
@@ -32,7 +37,8 @@ function readStatus(): LocalStatus {
     string
   >;
   const url = values.API_URL;
-  const publicKey = values.ANON_KEY ?? values.PUBLISHABLE_KEY;
+  // The app uses the publishable key (O4); older CLIs only print the anon key.
+  const publicKey = values.PUBLISHABLE_KEY ?? values.ANON_KEY;
   const serviceRoleKey = values.SERVICE_ROLE_KEY ?? values.SECRET_KEY;
   if (!url || !publicKey || !serviceRoleKey) {
     throw new Error(
@@ -40,8 +46,19 @@ function readStatus(): LocalStatus {
     );
   }
 
-  status = { url, publicKey, serviceRoleKey };
+  status = { url, publicKey, serviceRoleKey, mailpitUrl: values.MAILPIT_URL };
   return status;
+}
+
+/** Local Mailpit, which catches Auth emails. */
+export function mailpitUrl(): string {
+  const { mailpitUrl } = readStatus();
+  if (!mailpitUrl) {
+    throw new Error(
+      "Mailpit is not running. Start the stack with `npm run db:start`.",
+    );
+  }
+  return mailpitUrl;
 }
 
 const clientOptions = {
