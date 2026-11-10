@@ -6,7 +6,7 @@ import { z } from "zod";
 import { GENERIC_ERROR } from "@/lib/auth/errors";
 import { formValue, type FormState } from "@/lib/auth/form-state";
 import { requireUser } from "@/lib/auth/session";
-import { membersInJoinOrder } from "@/lib/expenses/queries";
+import { listMembersInJoinOrder } from "@/lib/households/queries";
 import {
   readExpenseForm,
   sharesJson,
@@ -34,7 +34,8 @@ function revalidateHouseholdPages() {
 
 async function validate(householdId: string, formData: FormData) {
   const household = await getHousehold(householdId);
-  const members = await membersInJoinOrder(household.id);
+  // Trusted, server-side list of who may take part, in join order (ADR-004).
+  const members = await listMembersInJoinOrder(household.id);
   const raw = readExpenseForm(formData);
   const result = validateExpenseForm(raw, {
     memberIds: members.map((m) => m.userId),

@@ -12,6 +12,7 @@ Records shared household expenses and home coordination. **The app never moves m
 - [docs/requirements-notes.md](docs/requirements-notes.md): domain model, security model, and amendments to the PRD/TRD PDFs
 - [docs/design-system.md](docs/design-system.md): design tokens, typography, components
 - [docs/knowledge-base.md](docs/knowledge-base.md): glossary and repository facts
+- [docs/money.md](docs/money.md): money representation, ISO 4217 decimals, the split engine, rounding and error codes
 
 ## Commands (npm only)
 

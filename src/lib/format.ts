@@ -1,16 +1,21 @@
 // Display formatting only. Money is stored as integer minor units (ADR-003);
 // nothing here converts amounts through binary floating point.
 
+import { isoMinorUnits } from "@/domain/money/currency";
+
 const LOCALE = "en-IN";
 
-/** Decimal places for an ISO 4217 currency, e.g. INR → 2, JPY → 0. */
+/**
+ * Decimal places for a currency from ISO 4217 (D2), e.g. INR → 2, JPY → 0,
+ * KWD → 3. The same on the server and in every browser. Throws for a code
+ * without a minor unit, which no household can have.
+ */
 export function currencyExponent(currency: string): number {
-  return (
-    new Intl.NumberFormat(LOCALE, {
-      style: "currency",
-      currency,
-    }).resolvedOptions().maximumFractionDigits ?? 2
-  );
+  const units = isoMinorUnits(currency);
+  if (units === null) {
+    throw new RangeError(`${currency} has no ISO 4217 minor unit`);
+  }
+  return units;
 }
 
 /** Converts integer minor units to an exact decimal string, e.g. (12345, 2) → "123.45". */
@@ -36,10 +41,15 @@ export function formatMoney(
   currency: string,
   options: { signDisplay?: "auto" | "never" | "always" | "exceptZero" } = {},
 ): string {
-  const decimal = minorToDecimalString(minor, currencyExponent(currency));
+  const exponent = currencyExponent(currency);
+  const decimal = minorToDecimalString(minor, exponent);
+  // Show exactly the ISO decimal places. Left to Intl, the browser's CLDR data
+  // could round the exact decimal (e.g. PKR to 0 places in Edge).
   return new Intl.NumberFormat(LOCALE, {
     style: "currency",
     currency,
+    minimumFractionDigits: exponent,
+    maximumFractionDigits: exponent,
     signDisplay: options.signDisplay ?? "auto",
   }).format(decimal as `${number}`);
 }

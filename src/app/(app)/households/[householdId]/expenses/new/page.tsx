@@ -9,9 +9,8 @@ import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { todayIn } from "@/lib/expenses/dates";
-import { membersInJoinOrder } from "@/lib/expenses/queries";
 import { currencyExponent } from "@/lib/format";
-import { getHousehold } from "@/lib/households/queries";
+import { getHousehold, listMembersInJoinOrder } from "@/lib/households/queries";
 import { createExpense } from "../actions";
 import { ExpenseForm } from "../expense-form";
 
@@ -34,7 +33,7 @@ async function NewExpense({
 }: Pick<PageProps<"/households/[householdId]/expenses/new">, "params">) {
   const { householdId } = await params;
   const household = await getHousehold(householdId);
-  const members = await membersInJoinOrder(household.id);
+  const members = await listMembersInJoinOrder(household.id);
   // A fresh key per visit, so resubmitting can't record the expense twice;
   // and "today" in the household's timezone (D11).
   await io();

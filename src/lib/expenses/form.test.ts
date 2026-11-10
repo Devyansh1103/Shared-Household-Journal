@@ -145,6 +145,42 @@ describe("validateExpenseForm", () => {
     ).toBeDefined();
   });
 
+  it("rejects custom shares with more decimals than the currency has", () => {
+    const result = errors({
+      splitMethod: "custom",
+      participants: [A, B],
+      shares: { [A]: "33.333", [B]: "66.667" },
+    });
+    expect(result[shareField(A)]).toBe("Use at most 2 decimal places.");
+    expect(result[shareField(B)]).toBe("Use at most 2 decimal places.");
+  });
+
+  it("respects currencies with three decimals (e.g. KWD)", () => {
+    const kwd = { memberIds: [A, B, C], exponent: 3 };
+    const ok = validateExpenseForm(
+      {
+        ...valid,
+        amount: "10.001",
+        splitMethod: "custom",
+        participants: [A, B],
+        shares: { [A]: "5.001", [B]: "5" },
+      },
+      kwd,
+    );
+    expect(ok.ok && sharesJson(ok.expense.shares)).toEqual([
+      { user_id: A, share_minor: 5001, percentage_bp: null },
+      { user_id: B, share_minor: 5000, percentage_bp: null },
+    ]);
+    // 1.000 KWD three ways: 0.334, 0.333, 0.333.
+    const equal = validateExpenseForm({ ...valid, amount: "1" }, kwd);
+    expect(
+      equal.ok && sharesJson(equal.expense.shares).map((s) => s.share_minor),
+    ).toEqual([334, 333, 333]);
+    expect(validateExpenseForm({ ...valid, amount: "1.0001" }, kwd).ok).toBe(
+      false,
+    );
+  });
+
   it("respects currencies without decimals", () => {
     const yen = { memberIds: [A], exponent: 0 };
     const result = validateExpenseForm(

@@ -127,26 +127,41 @@ export const getHousehold = cache(
   },
 );
 
-/** Active members, the owner first, then in order of joining. */
-export async function listMembers(householdId: string): Promise<Member[]> {
-  await getHousehold(householdId);
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("household_members")
-    .select("user_id, role, joined_at, profiles(display_name)")
-    .eq("household_id", householdId)
-    .is("left_at", null)
-    .order("joined_at");
-  if (error) throw new Error("Could not load the members.");
+/**
+ * Active members in the order they joined: by joined_at, then user id, as
+ * Postgres orders them. This is the order ADR-004 uses for leftover minor
+ * units, so it's taken from the database rather than re-sorted here (string
+ * comparison of timestamps isn't reliably chronological).
+ */
+export const listMembersInJoinOrder = cache(
+  async (householdId: string): Promise<Member[]> => {
+    await getHousehold(householdId);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("household_members")
+      .select("user_id, role, joined_at, profiles(display_name)")
+      .eq("household_id", householdId)
+      .is("left_at", null)
+      .order("joined_at", { ascending: true })
+      .order("user_id", { ascending: true });
+    if (error) throw new Error("Could not load the members.");
 
-  return data
-    .map((row) => ({
+    return data.map((row) => ({
       userId: row.user_id,
       displayName: row.profiles?.display_name ?? "Former member",
       role: row.role,
       joinedAt: row.joined_at,
-    }))
-    .sort((a, b) => Number(b.role === "owner") - Number(a.role === "owner"));
+    }));
+  },
+);
+
+/** Active members, the owner first, then in order of joining. */
+export async function listMembers(householdId: string): Promise<Member[]> {
+  const members = await listMembersInJoinOrder(householdId);
+  // Array.prototype.sort is stable, so join order is kept within each group.
+  return [...members].sort(
+    (a, b) => Number(b.role === "owner") - Number(a.role === "owner"),
+  );
 }
 
 const INVITATION_LIMIT = 50;

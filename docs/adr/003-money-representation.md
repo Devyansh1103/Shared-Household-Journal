@@ -29,4 +29,12 @@ TRD §3 forbids binary floating point as the source of truth for money. PRD §11
 
 ## Repository evidence
 
-None in code (see [phase-0 audit](../audits/phase-0.md)). Sources: TRD §3 and §5, PRD §11.
+Implemented in Phase 8 and hardened in Phase 9. See [money.md](../money.md).
+
+- `expenses.amount_minor` and `expense_splits.share_minor` are `bigint`.
+- The ISO 4217 exponents are pinned in `src/domain/money/currency.ts` rather than read from `Intl`,
+  whose CLDR data differs from ISO for some currencies and between runtimes.
+- The currency lock is `households_lock_currency`.
+- Codes without a minor unit are refused by `households_currency_has_minor_unit`.
+
+Sources: TRD §3 and §5, PRD §11.

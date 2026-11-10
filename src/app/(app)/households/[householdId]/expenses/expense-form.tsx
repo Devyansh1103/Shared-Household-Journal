@@ -153,7 +153,7 @@ export function ExpenseForm({
           label={`Amount (${currency})`}
           description={
             exponent > 0
-              ? `Up to ${exponent} decimal place${exponent === 1 ? "" : "s"}, like 1250${exponent === 1 ? ".5" : ".50"}.`
+              ? `Up to ${exponent} decimal place${exponent === 1 ? "" : "s"}, like 1250.${"5".padEnd(exponent, "0")}.`
               : "A whole amount, like 1250."
           }
           inputMode={exponent > 0 ? "decimal" : "numeric"}

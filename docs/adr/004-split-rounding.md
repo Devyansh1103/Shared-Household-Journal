@@ -33,4 +33,16 @@ The engine is a pure TypeScript module (`src/domain/money`). It is used for the 
 
 ## Repository evidence
 
-None in code (see [phase-0 audit](../audits/phase-0.md)). Source: TRD §5.
+Implemented in Phases 7–8, hardened in Phase 9. See [money.md](../money.md).
+
+- **Code:** `src/domain/money/split.ts` (`computeSplit`).
+- **Unit and property tests:** `split.test.ts` and `split.property.test.ts`, the latter with
+  thousands of seeded generated cases per method.
+- **Database checks:** `private.assert_expense_valid` and its deferred triggers. They check that
+  shares reconcile and that equal and percentage shares are within one unit of their exact value.
+  Which participants get the leftover units is left to the engine.
+- **Cross-check:** `supabase/tests/split-engine.test.ts` confirms the database stores exactly what
+  the engine produces.
+- **Join order** is read from Postgres (`joined_at, user_id`).
+
+Source: TRD §5.

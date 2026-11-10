@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getHousehold,
   listMembers,
+  listMembersInJoinOrder,
   type Household,
 } from "@/lib/households/queries";
 import type { ExpenseCategory } from "./categories";
@@ -131,7 +132,7 @@ export async function getExpense(
   const supabase = await createClient();
 
   const [members, result] = await Promise.all([
-    listMembers(household.id),
+    listMembersInJoinOrder(household.id),
     supabase
       .from("expenses")
       .select(
@@ -151,6 +152,7 @@ export async function getExpense(
   if (!row) notFound();
 
   const activeIds = new Set(members.map((m) => m.userId));
+  // Shares are listed in join order, the order the split engine used.
   const joinOrder = new Map(members.map((m, i) => [m.userId, i]));
   const me = household.myUserId;
   const isOwner = household.myRole === "owner";
@@ -162,12 +164,14 @@ export async function getExpense(
       shareMinor: split.share_minor,
       percentageBp: split.percentage_bp,
     }))
-    .sort(
-      (a, b) =>
+    .sort((a, b) => {
+      const byJoin =
         (joinOrder.get(a.userId) ?? Infinity) -
-          (joinOrder.get(b.userId) ?? Infinity) ||
-        a.userId.localeCompare(b.userId),
-    );
+        (joinOrder.get(b.userId) ?? Infinity);
+      if (byJoin) return byJoin;
+      // Former members: a fixed order by id (code points, not collation).
+      return a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0;
+    });
 
   const everyoneActive =
     activeIds.has(row.paid_by) && shares.every((s) => activeIds.has(s.userId));
@@ -203,13 +207,4 @@ export async function getExpense(
       everyoneActive,
     },
   };
-}
-
-/** Active members in the order they joined (ADR-004's order for leftovers). */
-export async function membersInJoinOrder(householdId: string) {
-  const members = await listMembers(householdId);
-  return [...members].sort(
-    (a, b) =>
-      a.joinedAt.localeCompare(b.joinedAt) || a.userId.localeCompare(b.userId),
-  );
 }

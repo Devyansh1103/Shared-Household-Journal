@@ -114,7 +114,7 @@ Last verified: 2026-11-11, after Phases 7–8.
 
 **Status**
 
-- **Implemented features:** the UI foundation, the Phase 4 database foundation, Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing), and Phase 6 households (create, list, overview, members, invite links, join, leave, remove, transfer ownership, delete when alone). No emails are sent for invites; links are copied and shared by hand. Phases 7–8 (2026-11-11): the split engine (`src/domain/money/`) and expenses (add, view, edit, soft delete, owner restore) with equal, percentage and custom splits. Balances and settlements are not built yet.
+- **Implemented features:** the UI foundation, the Phase 4 database foundation, Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing), and Phase 6 households (create, list, overview, members, invite links, join, leave, remove, transfer ownership, delete when alone). No emails are sent for invites; links are copied and shared by hand. Phases 7–8 (2026-11-11): the split engine (`src/domain/money/`) and expenses (add, view, edit, soft delete, owner restore) with equal, percentage and custom splits. Balances and settlements are not built yet. Phase 9 hardened the engine: ISO 4217 decimal places pinned in code, structured error codes, seeded property tests and a database cross-check (see [money.md](money.md)).
 - **Phase 3 (application shell)** was built after Phase 6, on 2026-11-10: sidebar from 1024px, top bar and bottom tab bar below. See [design-system.md](design-system.md#application-shell).
 - **Resolved:**
   - `npx` works.

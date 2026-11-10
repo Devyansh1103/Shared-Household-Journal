@@ -75,7 +75,7 @@ Typography roles are `type-*` utilities. They are deliberately not named `text-*
 
 ## Money and dates
 
-- `<Amount minor={…} currency="INR" tone? size? />` formats integer minor units with `en-IN` grouping, for example ₹1,23,45,678.90. It never converts through floating point. Tones are `neutral`, `positive`, `negative` and `muted`. A tone is only a hint, so always state the direction in words.
+- `<Amount minor={…} currency="INR" tone? size? />` formats integer minor units with `en-IN` grouping, for example ₹1,23,45,678.90. It never converts through floating point, and it shows exactly the currency's ISO 4217 decimal places (see [money.md](money.md)), the same in every browser. Tones are `neutral`, `positive`, `negative` and `muted`. A tone is only a hint, so always state the direction in words.
 - `formatDate("YYYY-MM-DD")` formats a calendar date without shifting it across timezones.
 - `formatDateTime(instant, timeZone)` formats an instant in the household's timezone (decision D11).
 

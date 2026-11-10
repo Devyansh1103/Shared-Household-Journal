@@ -8,7 +8,8 @@ import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatBasisPoints } from "@/domain/money/amount";
-import { getExpense, membersInJoinOrder } from "@/lib/expenses/queries";
+import { getExpense } from "@/lib/expenses/queries";
+import { listMembersInJoinOrder } from "@/lib/households/queries";
 import { currencyExponent, minorToDecimalString } from "@/lib/format";
 import { updateExpense } from "../../actions";
 import { ExpenseForm } from "../../expense-form";
@@ -64,7 +65,7 @@ async function EditExpense({
     );
   }
 
-  const members = await membersInJoinOrder(household.id);
+  const members = await listMembersInJoinOrder(household.id);
   const exponent = currencyExponent(household.currencyCode);
   const shares: Record<string, string> = {};
   const percents: Record<string, string> = {};

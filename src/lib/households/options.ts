@@ -1,6 +1,8 @@
 // Currency and timezone choices for a new household (D1, D11). The lists come
 // from the runtime's ISO 4217 and IANA data; the database checks them again
-// (currency format, and the timezone against pg_timezone_names).
+// (currency format and minor unit, and the timezone against pg_timezone_names).
+
+import { isoMinorUnits } from "@/domain/money/currency";
 
 const LOCALE = "en-IN";
 
@@ -28,13 +30,17 @@ let timeZones: string[] | undefined;
 export function currencyOptions(): CurrencyOption[] {
   if (!currencies) {
     const names = new Intl.DisplayNames(LOCALE, { type: "currency" });
-    currencies = Intl.supportedValuesOf("currency").map((code) => {
-      const name = names.of(code);
-      return {
-        code,
-        label: name && name !== code ? `${code} — ${name}` : code,
-      };
-    });
+    currencies = Intl.supportedValuesOf("currency")
+      // Codes without an ISO 4217 minor unit (e.g. XDR) can't hold money in
+      // minor units (D2).
+      .filter((code) => isoMinorUnits(code) !== null)
+      .map((code) => {
+        const name = names.of(code);
+        return {
+          code,
+          label: name && name !== code ? `${code} — ${name}` : code,
+        };
+      });
   }
   return currencies;
 }

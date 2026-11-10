@@ -9,8 +9,18 @@
  */
 export const MAX_AMOUNT_MINOR = BigInt("999999999999");
 
+/** Machine-readable reasons an amount is refused. Messages are for people. */
+export type AmountErrorCode =
+  | "empty"
+  | "bad_grouping"
+  | "malformed"
+  | "too_many_decimals"
+  | "not_positive"
+  | "too_large";
+
 export type AmountResult =
-  { ok: true; minor: bigint } | { ok: false; error: string };
+  | { ok: true; minor: bigint }
+  | { ok: false; code: AmountErrorCode; error: string };
 
 const NUMBER = /^(\d+)(?:\.(\d+))?$/;
 // Grouping commas are accepted only where they belong, so "12,50" (a decimal
@@ -24,7 +34,7 @@ const INTERNATIONAL_GROUPING = /^\d{1,3}(?:,\d{3})+$/;
  */
 export function parseAmount(input: string, exponent: number): AmountResult {
   const text = input.trim();
-  if (!text) return { ok: false, error: "Enter an amount." };
+  if (!text) return { ok: false, code: "empty", error: "Enter an amount." };
 
   const [integerPart, ...rest] = text.split(".");
   if (integerPart.includes(",")) {
@@ -34,6 +44,7 @@ export function parseAmount(input: string, exponent: number): AmountResult {
     ) {
       return {
         ok: false,
+        code: "bad_grouping",
         error: "Use a dot for decimals and commas only between thousands.",
       };
     }
@@ -44,6 +55,7 @@ export function parseAmount(input: string, exponent: number): AmountResult {
   if (!match) {
     return {
       ok: false,
+      code: "malformed",
       error:
         exponent > 0
           ? "Enter an amount like 1250 or 1250.50."
@@ -55,6 +67,7 @@ export function parseAmount(input: string, exponent: number): AmountResult {
   if (fraction.length > exponent) {
     return {
       ok: false,
+      code: "too_many_decimals",
       error:
         exponent === 0
           ? "This currency has no decimal places. Enter a whole amount."
@@ -67,30 +80,47 @@ export function parseAmount(input: string, exponent: number): AmountResult {
     BigInt(fraction.padEnd(exponent, "0") || "0");
 
   if (minor <= BigInt(0)) {
-    return { ok: false, error: "Enter an amount greater than zero." };
+    return {
+      ok: false,
+      code: "not_positive",
+      error: "Enter an amount greater than zero.",
+    };
   }
   if (minor > MAX_AMOUNT_MINOR) {
-    return { ok: false, error: "That amount is too large." };
+    return { ok: false, code: "too_large", error: "That amount is too large." };
   }
   return { ok: true, minor };
 }
 
-export type PercentResult =
-  { ok: true; basisPoints: number } | { ok: false; error: string };
+export type PercentErrorCode = "malformed" | "too_large";
 
-/** Parses a percentage like "50" or "33.33" into basis points (1% = 100). */
+export type PercentResult =
+  | { ok: true; basisPoints: number }
+  | { ok: false; code: PercentErrorCode; error: string };
+
+/**
+ * Parses a percentage like "50" or "33.33" into basis points (1% = 100):
+ * at most two decimal places, from 0 to 100. Negative, signed, exponent or
+ * "%"-suffixed input is malformed. Digits only, so nothing passes through
+ * floating point.
+ */
 export function parsePercent(input: string): PercentResult {
   const match = /^(\d{1,3})(?:\.(\d{1,2}))?$/.exec(input.trim());
   if (!match) {
     return {
       ok: false,
+      code: "malformed",
       error: "Enter a percentage like 50 or 33.33.",
     };
   }
   const basisPoints =
     Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0"));
   if (basisPoints > 10000) {
-    return { ok: false, error: "A share can't be more than 100%." };
+    return {
+      ok: false,
+      code: "too_large",
+      error: "A share can't be more than 100%.",
+    };
   }
   return { ok: true, basisPoints };
 }

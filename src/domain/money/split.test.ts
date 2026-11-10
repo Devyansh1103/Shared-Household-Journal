@@ -167,4 +167,129 @@ describe("computeSplit", () => {
     };
     expect(computeSplit(input)).toEqual(computeSplit(input));
   });
+
+  it("describes a successful split: method, total and shares", () => {
+    const result = computeSplit({
+      method: "equal",
+      total: b(100000),
+      participants: ["a", "b", "c"],
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      method: "equal",
+      total: b(100000),
+    });
+    // The brief's example: ₹1,000 three ways.
+    expect(result.ok && amounts(result.shares)).toEqual([33334, 33333, 33333]);
+  });
+});
+
+describe("structured errors", () => {
+  const code = (result: ReturnType<typeof computeSplit>) =>
+    result.ok ? "ok" : result.code;
+
+  it("names what's wrong with the total", () => {
+    for (const total of [b(0), b(-1), b("1000000000000")]) {
+      expect(
+        code(computeSplit({ method: "equal", total, participants: ["a"] })),
+      ).toBe("invalid_total");
+    }
+    expect(
+      code(
+        computeSplit({
+          method: "equal",
+          total: b("999999999999"),
+          participants: ["a"],
+        }),
+      ),
+    ).toBe("ok");
+  });
+
+  it("names what's wrong with the participants", () => {
+    const equal = (participants: string[]) =>
+      code(computeSplit({ method: "equal", total: b(100), participants }));
+    expect(equal([])).toBe("no_participants");
+    expect(equal(["a", ""])).toBe("invalid_participant");
+    expect(equal(["a", "  "])).toBe("invalid_participant");
+    const duplicate = computeSplit({
+      method: "equal",
+      total: b(100),
+      participants: ["a", "b", "a"],
+    });
+    expect(duplicate).toMatchObject({
+      ok: false,
+      code: "duplicate_participant",
+      userId: "a",
+    });
+  });
+
+  it("names what's wrong with percentages, and whose", () => {
+    const pct = (basisPoints: number[]) =>
+      computeSplit({
+        method: "percentage",
+        total: b(1000),
+        participants: basisPoints.map((bp, i) => ({
+          userId: `p${i}`,
+          basisPoints: bp,
+        })),
+      });
+    expect(pct([5000, 4999])).toMatchObject({ code: "percentages_not_100" });
+    expect(pct([5000, 5001])).toMatchObject({ code: "percentages_not_100" });
+    expect(pct([10000, -1, 1])).toMatchObject({
+      code: "invalid_percentage",
+      userId: "p1",
+    });
+    expect(pct([3333.5, 6666.5])).toMatchObject({
+      code: "invalid_percentage",
+      userId: "p0",
+    });
+    expect(pct([Number.NaN, 10000])).toMatchObject({
+      code: "invalid_percentage",
+    });
+  });
+
+  it("names what's wrong with custom shares, and whose", () => {
+    const custom = (shares: bigint[]) =>
+      computeSplit({
+        method: "custom",
+        total: b(1000),
+        participants: shares.map((shareMinor, i) => ({
+          userId: `p${i}`,
+          shareMinor,
+        })),
+      });
+    expect(custom([b(600), b(399)])).toMatchObject({
+      code: "shares_not_equal_total",
+    });
+    expect(custom([b(600), b(401)])).toMatchObject({
+      code: "shares_not_equal_total",
+    });
+    expect(custom([b(1100), b(-100)])).toMatchObject({
+      code: "negative_share",
+      userId: "p1",
+    });
+    // A number (e.g. 12.5) instead of whole minor units is refused, not rounded.
+    expect(
+      computeSplit({
+        method: "custom",
+        total: b(1000),
+        participants: [
+          { userId: "a", shareMinor: 12.5 as unknown as bigint },
+          { userId: "b", shareMinor: b(988) },
+        ],
+      }),
+    ).toMatchObject({ code: "invalid_share", userId: "a" });
+  });
+
+  it("keeps a plain-language message for people", () => {
+    const result = computeSplit({
+      method: "equal",
+      total: b(100),
+      participants: [],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Choose at least one person to split with.");
+    }
+  });
 });
