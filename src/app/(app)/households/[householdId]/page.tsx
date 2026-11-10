@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, PlusIcon } from "lucide-react";
 import { FormAlert } from "@/components/form-alert";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Section } from "@/components/layout/section";
@@ -102,6 +103,25 @@ async function HouseholdContent({
           </dl>
         </CardContent>
       </Card>
+
+      <Section
+        title="Expenses"
+        description="Shared costs, who paid, and how each one is split."
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href={`/households/${household.id}/expenses/new`}>
+              <PlusIcon aria-hidden="true" data-icon="inline-start" />
+              Add expense
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href={`/households/${household.id}/expenses`}>
+              View expenses
+            </Link>
+          </Button>
+        </div>
+      </Section>
 
       <Section
         title="Members"

@@ -1,6 +1,6 @@
 # ADR-006: Atomic money writes through Postgres functions that also write the journal
 
-- **Status:** Confirmed (2026-11-02). Decision A3.
+- **Status:** Confirmed (2026-11-02), amended 2026-11-11 (see below). Decision A3.
 
 ## Context
 
@@ -32,6 +32,27 @@ Each function does three things in one transaction:
 
 - Functions run as `SECURITY INVOKER` wherever possible, so RLS still applies.
 - Only `create_household` and `accept_invite` are `SECURITY DEFINER`. Each one checks the user and token explicitly.
+
+## Amendment (2026-11-11, approved by the owner)
+
+The "SECURITY INVOKER wherever possible" rule turned out to conflict with the journal guarantee. A
+function running with the caller's rights can only write a table the caller can also write
+directly through the Data API, and a direct write skips the function's checks and its journal
+entry (D6).
+
+So these functions are `SECURITY DEFINER`, and signed-in users have **no** direct insert, update
+or delete privileges on the tables they write:
+
+- **Membership (Phase 6):** `leave_household`, `remove_member`, `transfer_ownership`,
+  `delete_household`, alongside `create_household` and `accept_invite`.
+- **Expenses (Phase 8):** `create_expense`, `update_expense`, `delete_expense`, `restore_expense`.
+
+Each one takes the caller from `auth.uid()` (never an argument), checks the caller's own active
+membership and role, checks the money invariants, writes the change and its `activity_events` row,
+and has `EXECUTE` granted to `authenticated` only. As defence in depth, a deferred constraint
+trigger re-checks that shares add up at commit, whatever the write path (even the service role).
+
+Settlement functions (Phase 10) follow the same pattern.
 
 ## Consequences
 

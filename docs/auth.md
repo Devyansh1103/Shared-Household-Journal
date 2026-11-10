@@ -17,19 +17,20 @@ Built in Phase 5. Supabase Auth with email and password (A3), sessions in cookie
 
 ## Routes
 
-| Route              | Access    | Purpose                                                                                       |
-| ------------------ | --------- | --------------------------------------------------------------------------------------------- |
-| `/`                | Public    | Landing page with "Create an account" and "Sign in".                                          |
-| `/sign-up`         | Public    | Name, email, password. Ends with "check your email".                                          |
-| `/sign-in`         | Public    | Email and password. Honours a safe `?next=`. Signed-in visitors are sent on.                  |
-| `/forgot-password` | Public    | Requests a reset link. Always the same neutral answer.                                        |
-| `/auth/confirm`    | Public    | Email link handler (`type=email` → `/home?confirmed=1`, `type=recovery` → `/reset-password`). |
-| `/home`            | Signed in | Welcome page and the list of your households (or an empty state).                             |
-| `/households/new`  | Signed in | Create a household (name, currency, timezone). Phase 6.                                       |
-| `/households/[id]` | Member    | Household overview: details, members, invite links, leave/delete. Non-members get a 404.      |
-| `/invite/[token]`  | Public    | Signed out: asks to sign in, reveals nothing. Signed in: preview and "Join household".        |
-| `/profile`         | Signed in | Edit display name. Shows your own email (read-only).                                          |
-| `/reset-password`  | Signed in | Set a new password (reached from the recovery email).                                         |
+| Route                                                                         | Access    | Purpose                                                                                       |
+| ----------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------- |
+| `/`                                                                           | Public    | Landing page with "Create an account" and "Sign in".                                          |
+| `/sign-up`                                                                    | Public    | Name, email, password. Ends with "check your email".                                          |
+| `/sign-in`                                                                    | Public    | Email and password. Honours a safe `?next=`. Signed-in visitors are sent on.                  |
+| `/forgot-password`                                                            | Public    | Requests a reset link. Always the same neutral answer.                                        |
+| `/auth/confirm`                                                               | Public    | Email link handler (`type=email` → `/home?confirmed=1`, `type=recovery` → `/reset-password`). |
+| `/home`                                                                       | Signed in | Welcome page and the list of your households (or an empty state).                             |
+| `/households/new`                                                             | Signed in | Create a household (name, currency, timezone). Phase 6.                                       |
+| `/households/[id]`                                                            | Member    | Household overview: details, members, invite links, leave/delete. Non-members get a 404.      |
+| `/invite/[token]`                                                             | Public    | Signed out: asks to sign in, reveals nothing. Signed in: preview and "Join household".        |
+| `/households/[id]/expenses` (and `/new`, `/[expenseId]`, `/[expenseId]/edit`) | Member    | Expenses (Phase 8). Non-members get a 404. Edit/delete per D6; restore for the owner.         |
+| `/profile`                                                                    | Signed in | Edit display name. Shows your own email (read-only).                                          |
+| `/reset-password`                                                             | Signed in | Set a new password (reached from the recovery email).                                         |
 
 Signed-in routes live in the `(app)` route group. Its layout renders the page only after
 `requireUser()` succeeds on the server. Because of `cacheComponents`, that check sits inside a

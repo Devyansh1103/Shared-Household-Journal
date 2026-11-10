@@ -36,15 +36,15 @@ All Confirmed entries below were approved by the project owner on **2026-11-02**
 
 ## Architecture decisions
 
-| ID  | Decision                                                                                                             | Status    | ADR                                                             |
-| --- | -------------------------------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------------- |
-| A1  | Next.js (App Router) + TypeScript in strict mode, at the current stable version, verified at install time            | Confirmed | [001](adr/001-stack.md)                                         |
-| A2  | npm as the package manager                                                                                           | Confirmed | [001](adr/001-stack.md)                                         |
-| A3  | Supabase: Postgres, Auth, and RLS as the main access control. All money writes go through atomic Postgres functions. | Confirmed | [002](adr/002-supabase-rls.md), [006](adr/006-atomic-writes.md) |
-| A4  | Local Supabase in Docker for development; Supabase CLI installed as a project dev dependency, not globally           | Confirmed | [002](adr/002-supabase-rls.md)                                  |
-| A5  | Tailwind CSS + shadcn/ui + lucide icons                                                                              | Confirmed | [001](adr/001-stack.md)                                         |
-| A6  | Vitest for domain logic and RLS tests; Playwright for end-to-end tests from Phase 8                                  | Confirmed | [012](adr/012-testing.md)                                       |
-| R1  | Reordered roadmap                                                                                                    | Confirmed | [roadmap.md](roadmap.md)                                        |
+| ID  | Decision                                                                                                                                                                                                        | Status    | ADR                                                             |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------------- |
+| A1  | Next.js (App Router) + TypeScript in strict mode, at the current stable version, verified at install time                                                                                                       | Confirmed | [001](adr/001-stack.md)                                         |
+| A2  | npm as the package manager                                                                                                                                                                                      | Confirmed | [001](adr/001-stack.md)                                         |
+| A3  | Supabase: Postgres, Auth, and RLS as the main access control. All money writes go through atomic Postgres functions. Amended 2026-11-11: membership and expense functions are `SECURITY DEFINER` (see ADR-006). | Confirmed | [002](adr/002-supabase-rls.md), [006](adr/006-atomic-writes.md) |
+| A4  | Local Supabase in Docker for development; Supabase CLI installed as a project dev dependency, not globally                                                                                                      | Confirmed | [002](adr/002-supabase-rls.md)                                  |
+| A5  | Tailwind CSS + shadcn/ui + lucide icons                                                                                                                                                                         | Confirmed | [001](adr/001-stack.md)                                         |
+| A6  | Vitest for domain logic and RLS tests; Playwright for end-to-end tests from Phase 8                                                                                                                             | Confirmed | [012](adr/012-testing.md)                                       |
+| R1  | Reordered roadmap                                                                                                                                                                                               | Confirmed | [roadmap.md](roadmap.md)                                        |
 
 ## Open items
 
@@ -54,10 +54,10 @@ All Confirmed entries below were approved by the project owner on **2026-11-02**
 | O2  | Data-retention periods                                                                                                                                                                                                                     | Open      | Phase 18  |
 | O3  | Who may edit budgets. Proposed: owner only.                                                                                                                                                                                                | Proposed  | Phase 16  |
 | O4  | Supabase public key: the **publishable** key, as `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (with `NEXT_PUBLIC_SUPABASE_URL`). Resolved 2026-11-04.                                                                                            | Confirmed | Phase 5   |
-| O5  | Whether React Hook Form is needed for the split editor                                                                                                                                                                                     | Open      | Phase 8   |
+| O5  | Whether React Hook Form is needed for the split editor. **No:** plain React state with the existing Server Action pattern; no form library. Resolved 2026-11-11.                                                                           | Confirmed | Phase 8   |
 | O6  | D5 says invites default to 7 days and 10 uses. Are those also maximums a member cannot exceed? The database currently enforces only `max_uses > 0` and expiry after creation. Phase 6 left this open: the app only ever uses the defaults. | Open      | Phase 6   |
 | O7  | Should a removed member be blocked from rejoining? Today their own invite links are revoked on removal, but they can rejoin with any other active link. Raised in Phase 6.                                                                 | Open      | Phase 17  |
-| O8  | Can the owner remove a member whose balance isn't zero (D13 covers only leaving)? Moot until balances exist. Raised in Phase 6.                                                                                                            | Open      | Phase 9   |
+| O8  | Can the owner remove a member whose balance isn't zero? **No:** the same rule as leaving (D13); removal needs a zero balance. Enforced in `remove_member`. Resolved 2026-11-11.                                                            | Confirmed | Phase 8   |
 
 ## Details
 

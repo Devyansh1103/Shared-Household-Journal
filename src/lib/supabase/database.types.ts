@@ -58,6 +58,127 @@ export type Database = {
           },
         ];
       };
+      expense_splits: {
+        Row: {
+          expense_id: string;
+          household_id: string;
+          percentage_bp: number | null;
+          share_minor: number;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          expense_id: string;
+          household_id: string;
+          percentage_bp?: number | null;
+          share_minor: number;
+          user_id: string;
+        };
+        Update: {
+          expense_id?: string;
+          household_id?: string;
+          percentage_bp?: number | null;
+          share_minor?: number;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "expense_splits_expense_fkey";
+            columns: ["expense_id", "household_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["id", "household_id"];
+          },
+          {
+            foreignKeyName: "expense_splits_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      expenses: {
+        Row: {
+          amount_minor: number;
+          category: Database["public"]["Enums"]["expense_category"];
+          created_at: string;
+          created_by: string;
+          creation_key: string | null;
+          deleted_at: string | null;
+          deleted_by: string | null;
+          description: string;
+          expense_date: string;
+          household_id: string;
+          id: string;
+          paid_by: string;
+          split_method: Database["public"]["Enums"]["split_method"];
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount_minor: number;
+          category: Database["public"]["Enums"]["expense_category"];
+          created_at?: string;
+          created_by: string;
+          creation_key?: string | null;
+          deleted_at?: string | null;
+          deleted_by?: string | null;
+          description: string;
+          expense_date: string;
+          household_id: string;
+          id?: string;
+          paid_by: string;
+          split_method: Database["public"]["Enums"]["split_method"];
+          updated_at?: string;
+        };
+        Update: {
+          amount_minor?: number;
+          category?: Database["public"]["Enums"]["expense_category"];
+          created_at?: string;
+          created_by?: string;
+          creation_key?: string | null;
+          deleted_at?: string | null;
+          deleted_by?: string | null;
+          description?: string;
+          expense_date?: string;
+          household_id?: string;
+          id?: string;
+          paid_by?: string;
+          split_method?: Database["public"]["Enums"]["split_method"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "expenses_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "expenses_deleted_by_fkey";
+            columns: ["deleted_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "expenses_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "expenses_paid_by_fkey";
+            columns: ["paid_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       household_members: {
         Row: {
           household_id: string;
@@ -235,6 +356,20 @@ export type Database = {
           joined_household_id: string;
         }[];
       };
+      create_expense: {
+        Args: {
+          amount: number;
+          expense_category: Database["public"]["Enums"]["expense_category"];
+          method: Database["public"]["Enums"]["split_method"];
+          payer_id: string;
+          request_key?: string;
+          shares: Json;
+          spent_on: string;
+          target_household_id: string;
+          title: string;
+        };
+        Returns: string;
+      };
       create_household: {
         Args: {
           currency: string;
@@ -243,6 +378,10 @@ export type Database = {
           time_zone: string;
         };
         Returns: string;
+      };
+      delete_expense: {
+        Args: { target_expense_id: string };
+        Returns: undefined;
       };
       delete_household: {
         Args: { target_household_id: string };
@@ -265,13 +404,32 @@ export type Database = {
         Args: { member_user_id: string; target_household_id: string };
         Returns: undefined;
       };
+      restore_expense: {
+        Args: { target_expense_id: string };
+        Returns: undefined;
+      };
       transfer_ownership: {
         Args: { new_owner_user_id: string; target_household_id: string };
         Returns: undefined;
       };
+      update_expense: {
+        Args: {
+          amount: number;
+          expected_updated_at?: string;
+          expense_category: Database["public"]["Enums"]["expense_category"];
+          method: Database["public"]["Enums"]["split_method"];
+          payer_id: string;
+          shares: Json;
+          spent_on: string;
+          target_expense_id: string;
+          title: string;
+        };
+        Returns: undefined;
+      };
     };
     Enums: {
-      activity_entity_type: "household" | "household_member" | "invitation";
+      activity_entity_type:
+        "household" | "household_member" | "invitation" | "expense";
       activity_event_type:
         | "household_created"
         | "member_joined"
@@ -279,8 +437,22 @@ export type Database = {
         | "member_removed"
         | "ownership_transferred"
         | "invitation_created"
-        | "invitation_revoked";
+        | "invitation_revoked"
+        | "expense_created"
+        | "expense_updated"
+        | "expense_deleted"
+        | "expense_restored";
+      expense_category:
+        | "rent"
+        | "utilities"
+        | "groceries"
+        | "household_supplies"
+        | "internet"
+        | "dining"
+        | "transport"
+        | "other";
       household_role: "owner" | "member";
+      split_method: "equal" | "percentage" | "custom";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -408,7 +580,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      activity_entity_type: ["household", "household_member", "invitation"],
+      activity_entity_type: [
+        "household",
+        "household_member",
+        "invitation",
+        "expense",
+      ],
       activity_event_type: [
         "household_created",
         "member_joined",
@@ -417,8 +594,23 @@ export const Constants = {
         "ownership_transferred",
         "invitation_created",
         "invitation_revoked",
+        "expense_created",
+        "expense_updated",
+        "expense_deleted",
+        "expense_restored",
+      ],
+      expense_category: [
+        "rent",
+        "utilities",
+        "groceries",
+        "household_supplies",
+        "internet",
+        "dining",
+        "transport",
+        "other",
       ],
       household_role: ["owner", "member"],
+      split_method: ["equal", "percentage", "custom"],
     },
   },
 } as const;

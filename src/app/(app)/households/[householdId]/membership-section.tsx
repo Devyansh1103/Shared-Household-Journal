@@ -17,7 +17,7 @@ export function MembershipSection({
     return (
       <Section
         title="Leave this household"
-        description="You'll lose access straight away. Your name stays on past records, and invite links you created stop working."
+        description="You can leave once your balance is zero. You'll lose access straight away, your name stays on past records, and invite links you created stop working."
       >
         <div>
           <ConfirmActionDialog

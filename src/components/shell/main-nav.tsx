@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { HouseIcon, UserRoundIcon, UsersIcon } from "lucide-react";
+import { HouseIcon, ReceiptIcon, UserRoundIcon, UsersIcon } from "lucide-react";
 import { cn } from "cn";
 import {
   currentHousehold,
@@ -14,7 +14,15 @@ import {
 const ICONS: Record<NavItemKey, typeof HouseIcon> = {
   home: HouseIcon,
   household: UsersIcon,
+  expenses: ReceiptIcon,
   profile: UserRoundIcon,
+};
+
+// Literal class names, so Tailwind generates them.
+const BOTTOM_COLUMNS: Record<number, string> = {
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-4",
 };
 
 /**
@@ -68,9 +76,7 @@ export function MainNav({
 
   return (
     <nav aria-label="Main">
-      <ul
-        className={cn("grid", items.length > 2 ? "grid-cols-3" : "grid-cols-2")}
-      >
+      <ul className={cn("grid", BOTTOM_COLUMNS[items.length])}>
         {items.map((item) => {
           const Icon = ICONS[item.key];
           const active = isActive(item, pathname);

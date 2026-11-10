@@ -77,8 +77,49 @@ Triggers:
   `display_name`, falling back to "New member". It never uses the email.
 - `*_set_updated_at` maintains `updated_at`.
 
-Money: no money columns exist yet. When they arrive (Phase 8 onwards) they are `bigint` minor units
-with the `_minor` suffix (D2, ADR-003). The currency lock (D1) is added with the expenses table.
+## Expenses and splits (Phase 8)
+
+Money is `bigint` minor units with the `_minor` suffix, in the household's currency (D1, D2,
+ADR-003). There is no float anywhere: the app parses typed amounts as text into `BigInt`
+([src/domain/money/amount.ts](../src/domain/money/amount.ts)), and the split engine
+([src/domain/money/split.ts](../src/domain/money/split.ts), ADR-004) works in `BigInt` too.
+
+| Table            | Purpose                  | Key constraints                                                                                                                                                                                                                                                                                                                                            |
+| ---------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `expenses`       | A shared cost            | `amount_minor` 1 – 999,999,999,999 (keeps every amount and sum inside JavaScript's safe-integer range). `description` 1–120 chars, trimmed. `category` enum (D17). `expense_date` is a `date` (D11). `split_method` enum `equal`/`percentage`/`custom`. `deleted_at` and `deleted_by` set together (D7). `creation_key` makes `create_expense` idempotent. |
+| `expense_splits` | Each participant's share | Primary key (`expense_id`, `user_id`). `share_minor ≥ 0`. `percentage_bp` 0–10000, percentage splits only. Composite key (`expense_id`, `household_id`) → `expenses`, so a split can't point at another household's expense.                                                                                                                               |
+
+Money invariants (ADR-004), checked by the functions straight away and again at commit by the
+deferred constraint triggers `expenses_check_invariants` / `expense_splits_check_invariants`, for
+every write path including the service role:
+
+- at least one participant, and the shares add up exactly to `amount_minor`;
+- percentage splits: every share has basis points, they total 10000, and each share is its exact
+  percentage floored, or that plus one leftover unit;
+- equal splits: shares differ by at most one unit; other methods carry no percentages.
+
+Functions (all `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` for `authenticated` only; ADR-006
+as amended). Each takes the caller from `auth.uid()` and writes an `activity_events` row with old
+and new values (D6):
+
+| Function                                                                                                                 | Who                          | What                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_expense(target_household_id, title, amount, expense_category, spent_on, payer_id, method, shares, request_key?)` | Active member                | Payer and every participant must be active members. `shares` is `[{user_id, share_minor, percentage_bp}]`. A repeated `request_key` returns the first expense. |
+| `update_expense(target_expense_id, …same fields…, expected_updated_at?)`                                                 | Creator, payer or owner (D6) | Replaces every field and the whole split. Refuses deleted expenses, and refuses with `HJ010` if `updated_at` changed since the form loaded.                    |
+| `delete_expense(target_expense_id)`                                                                                      | Creator, payer or owner (D6) | Soft delete (D7): sets `deleted_at`/`deleted_by`; the row and its splits stay readable.                                                                        |
+| `restore_expense(target_expense_id)`                                                                                     | Owner (D7)                   | Clears the delete. Refused if the payer or a participant has since left.                                                                                       |
+
+Other rules added in Phase 8:
+
+- **Currency lock (D1):** `households_lock_currency` rejects a currency change (`HJ012`) once the
+  household has any expense, deleted ones included.
+- **Zero balance to leave or be removed (D13, O8):** `leave_household` and `remove_member` now
+  refuse with `HJ006` while `private.member_net_minor` (paid minus shares, over non-deleted
+  expenses) isn't zero. Settlements join that sum in Phase 10.
+
+Error codes: `HJ006` balance not zero, `HJ007` payer or participant not an active member, `HJ008`
+invalid split, `HJ009` no such expense (also for other households' ids), `HJ010` changed since
+loaded, `HJ011` deleted / not deleted, `HJ012` currency locked.
 
 ## Access control
 
@@ -101,6 +142,8 @@ Helpers live in the `private` schema, which the Data API does not expose. All ar
 | `household_members` | Active members of that household (all rows, incl. left)      | No (functions only)                                                         | No                                                                      | No     |
 | `activity_events`   | Active members                                               | No (functions and triggers only)                                            | No                                                                      | No     |
 | `invitations`       | Active members                                               | Active members; `household_id`, `token_hash`, `expires_at`, `max_uses` only | Set `revoked_at` on an unrevoked invite: its creator, or the owner (D4) | No     |
+| `expenses`          | Active members (deleted ones too, D7)                        | No (`create_expense`)                                                       | No (`update_expense`, `delete_expense`, `restore_expense`)              | No     |
+| `expense_splits`    | Active members                                               | No (functions only)                                                         | No                                                                      | No     |
 
 "No" means there is no policy **and** no table privilege, so the request fails with `42501`.
 Column-level grants stop an allowed row update from also changing ids, creators or counters.
@@ -109,9 +152,10 @@ Members who leave or are removed lose access immediately, because every check re
 
 ## Not built yet
 
-- **D13 zero-balance check in `leave_household`.** No balances exist until expenses do, so every
-  balance is zero today. It must be added to `leave_household` with the expenses table (Phase 8/9).
 - Invitation caps (O6, still Open): the DB enforces `max_uses > 0` and expiry after creation, but no
   upper bound. The app always uses the defaults (7 days, 10 uses) and offers no other values, but a
   member calling the Data API directly can still insert other values, as since Phase 4.
-- Currency lock once an expense exists (Phase 8).
+- Settlements (Phase 10): `member_net_minor` must include them when they arrive.
+- Pairwise balances shown to people (Phase 9).
+- `expenses.recurring_bill_id` / `recurrence_period` and their unique key arrive with recurring
+  bills (Phase 14).

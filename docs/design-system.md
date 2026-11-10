@@ -184,4 +184,15 @@ In Phase 2, the pages were also checked in a real browser (Edge, driven by Playw
 - Keyboard focus visibility.
 - Dialog focus management.
 
-Repeat these checks when changing shared UI. Playwright becomes a project dependency in Phase 8 (decision A6).
+Repeat these checks when changing shared UI.
+
+Since Phase 8, Playwright is a project dependency (A6): `npm run test:e2e` runs `e2e/*.spec.ts`
+against `next start` on port 3100 (run `npm run build` and `npm run db:start` first). Set
+`PLAYWRIGHT_CHANNEL=msedge` (or `chrome`) to use an installed browser, or run
+`npx playwright install chromium` once. It runs a desktop and a Pixel 7 project.
+
+**Unique ids in forms.** Next.js keeps the previous page mounted (hidden) after a client
+navigation, so the same form component can be in the document twice (for example "Add expense"
+and "Edit expense"). Fixed ids then clash, and a label can point at the hidden copy. Build ids for
+reusable forms from React's `useId()`. In browser tests, match visible elements only and wait for
+the new page's heading after navigating: the URL changes before the page streams in.

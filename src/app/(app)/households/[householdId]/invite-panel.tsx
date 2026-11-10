@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useSyncExternalStore } from "react";
+import { useActionState, useId, useSyncExternalStore } from "react";
 import { CopyIcon } from "lucide-react";
 import { toast } from "sonner";
 import { FormAlert } from "@/components/form-alert";
@@ -27,6 +27,8 @@ export function InvitePanel({
   const [state, formAction] = useActionState(createInvite, initialState);
   const origin = useSyncExternalStore(noSubscription, browserOrigin, noOrigin);
   const link = state.invite ? `${origin}${state.invite.path}` : null;
+  // Two households' pages can both be mounted (the previous one hidden).
+  const linkId = `${useId()}-invite-link`;
 
   async function copy() {
     if (!link) return;
@@ -58,14 +60,14 @@ export function InvitePanel({
             shown only once.
           </FormAlert>
           <Field>
-            <FieldLabel htmlFor="invite-link">Invite link</FieldLabel>
+            <FieldLabel htmlFor={linkId}>Invite link</FieldLabel>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
-                id="invite-link"
+                id={linkId}
                 readOnly
                 value={link}
                 onFocus={(event) => event.currentTarget.select()}
-                aria-describedby="invite-link-help"
+                aria-describedby={`${linkId}-help`}
                 className="font-mono text-sm"
               />
               <Button type="button" variant="secondary" onClick={copy}>
@@ -73,7 +75,7 @@ export function InvitePanel({
                 Copy link
               </Button>
             </div>
-            <FieldDescription id="invite-link-help">
+            <FieldDescription id={`${linkId}-help`}>
               Works until {formatDateTime(state.invite.expiresAt, timeZone)},
               for up to {state.invite.maxUses} people.
             </FieldDescription>

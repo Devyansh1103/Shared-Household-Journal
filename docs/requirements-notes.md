@@ -79,7 +79,7 @@ Every table has a uuid `id`, `created_at`, and `updated_at` where relevant.
 2. **Helper functions:** `is_household_member(household_id)` and `household_role(household_id)`. Both are `SECURITY DEFINER`, have a fixed `search_path`, and check only `auth.uid()`.
 3. **Writes through functions:** all money and membership changes go through Postgres functions ([ADR-006](adr/006-atomic-writes.md)).
    - Inside these functions, the payer and every participant must be active members of the same household.
-   - Only `create_household` and `accept_invite` use elevated rights, and both check the caller explicitly.
+   - The membership and expense functions use elevated rights (`SECURITY DEFINER`), and each checks the caller explicitly. Signed-in users have no direct write privileges on those tables. Amended 2026-11-11 ([ADR-006](adr/006-atomic-writes.md#amendment-2026-11-11-approved-by-the-owner)); originally only `create_household` and `accept_invite`.
 4. **Owner-only actions** are enforced in policies and functions, not just hidden in the UI.
 5. **Invite tokens:** 32 random bytes, stored only as a SHA-256 hash. Expiry, use limit, and revocation are checked in a single transaction.
 6. **Input validation:** Zod at the Server Action boundary, plus database constraints.

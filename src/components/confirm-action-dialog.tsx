@@ -25,6 +25,8 @@ type ConfirmActionDialogProps = {
   title: string;
   description: React.ReactNode;
   confirmLabel: string;
+  /** Names the safe choice, e.g. "Keep expense". Focused when the dialog opens. */
+  cancelLabel?: string;
   pendingLabel: string;
   destructive?: boolean;
   /** A Server Action. It may redirect; otherwise its success message is toasted and the dialog closes. */
@@ -41,6 +43,7 @@ export function ConfirmActionDialog({
   title,
   description,
   confirmLabel,
+  cancelLabel = "Cancel",
   pendingLabel,
   destructive = false,
   action,
@@ -84,7 +87,7 @@ export function ConfirmActionDialog({
             <input key={name} type="hidden" name={name} value={value} />
           ))}
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
             <SubmitButton
               variant={destructive ? "destructive" : "default"}
               pendingLabel={pendingLabel}

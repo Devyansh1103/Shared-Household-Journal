@@ -80,7 +80,7 @@ Never record an unconfirmed assumption here as a fact.
 
 ## Repository facts
 
-Last verified: 2026-11-10, after Phase 6.
+Last verified: 2026-11-11, after Phases 7–8.
 
 **Stack**
 
@@ -110,10 +110,11 @@ Last verified: 2026-11-10, after Phase 6.
 
 - `npm run dev`, `build`, `lint`, `typecheck`, `test` (Vitest), `format`, `format:check`.
 - `npm run db:start`, `db:stop`, `db:status`, `db:types`, `test:db` (RLS and Auth tests; need the local stack).
+- `npm run test:e2e`: Playwright end-to-end tests (A6, since Phase 8); need a build and the local stack.
 
 **Status**
 
-- **Implemented features:** the UI foundation, the Phase 4 database foundation, Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing), and Phase 6 households (create, list, overview, members, invite links, join, leave, remove, transfer ownership, delete when alone). No emails are sent for invites; links are copied and shared by hand.
+- **Implemented features:** the UI foundation, the Phase 4 database foundation, Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing), and Phase 6 households (create, list, overview, members, invite links, join, leave, remove, transfer ownership, delete when alone). No emails are sent for invites; links are copied and shared by hand. Phases 7–8 (2026-11-11): the split engine (`src/domain/money/`) and expenses (add, view, edit, soft delete, owner restore) with equal, percentage and custom splits. Balances and settlements are not built yet.
 - **Phase 3 (application shell)** was built after Phase 6, on 2026-11-10: sidebar from 1024px, top bar and bottom tab bar below. See [design-system.md](design-system.md#application-shell).
 - **Resolved:**
   - `npx` works.

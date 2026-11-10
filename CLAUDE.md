@@ -50,6 +50,7 @@ Records shared household expenses and home coordination. **The app never moves m
 - Migrations in `supabase/migrations/`; schema and access rules in [docs/database.md](docs/database.md).
 - RLS helpers live in the unexposed `private` schema. Regenerate types with `npm run db:types` after a migration.
 - `npm run test:db` runs RLS and Auth tests against the local stack (`npm run db:start`); they are not part of `npm test`.
+- `npm run test:e2e` runs Playwright tests (`e2e/`) against `next start` on port 3100; needs `npm run build` and the local stack. Set `PLAYWRIGHT_CHANNEL=msedge` to use the installed Edge.
 
 **Auth** ([docs/auth.md](docs/auth.md))
 

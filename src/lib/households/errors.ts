@@ -16,6 +16,16 @@ const MESSAGES: Record<string, string> = {
   HJ004:
     "You can delete the household only when you're its only member. Remove the others or make one of them the owner first.",
   HJ005: "You can't do that to yourself.",
+  HJ006:
+    "That balance isn't zero yet. Someone can leave or be removed only once the shared costs involving them even out.",
+  HJ007:
+    "Everyone in an expense must be a current member of the household. Someone here has left.",
+  HJ008: "The split doesn't add up. Check the shares and try again.",
+  HJ009: "We couldn't find that expense.",
+  HJ010:
+    "Someone changed this expense while you were editing. Reload the page to see their changes, then try again.",
+  HJ011: "That can't be done to this expense right now. Reload the page.",
+  HJ012: "The currency can't be changed once the household has expenses.",
   "42501": "You don't have permission to do that.",
   "23514": "Some of those details aren't valid. Check them and try again.",
   "22023": "Choose a timezone from the list.",

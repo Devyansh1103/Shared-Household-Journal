@@ -63,7 +63,7 @@ export function MemberList({
                   triggerLabel="Remove"
                   triggerAriaLabel={`Remove ${member.displayName}`}
                   title={`Remove ${member.displayName}?`}
-                  description={`${member.displayName} loses access to this household straight away, and invite links they created stop working. Their name stays on past records. They could still rejoin with an active link someone else created, so revoke any they may have.`}
+                  description={`Only possible once ${member.displayName}'s balance is zero. ${member.displayName} loses access to this household straight away, and invite links they created stop working. Their name stays on past records. They could still rejoin with an active link someone else created, so revoke any they may have.`}
                   confirmLabel="Remove"
                   pendingLabel="Removing…"
                   destructive

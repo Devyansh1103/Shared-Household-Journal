@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { io } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -22,6 +23,9 @@ export type Profile = {
  * cookie. Runs once per request.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  // Supabase reads the clock to check the session, which is request-time work:
+  // tell Next.js, so prefetch prerendering stops here instead of logging an error.
+  await io();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
