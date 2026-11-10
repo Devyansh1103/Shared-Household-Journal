@@ -9,6 +9,55 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      activity_events: {
+        Row: {
+          actor_id: string | null;
+          created_at: string;
+          entity_id: string;
+          entity_type: Database["public"]["Enums"]["activity_entity_type"];
+          household_id: string;
+          id: string;
+          summary: NonNullable<Json>;
+          type: Database["public"]["Enums"]["activity_event_type"];
+        };
+        ComputedFields: never;
+        Insert: {
+          actor_id?: string | null;
+          created_at?: string;
+          entity_id: string;
+          entity_type: Database["public"]["Enums"]["activity_entity_type"];
+          household_id: string;
+          id?: string;
+          summary?: NonNullable<Json>;
+          type: Database["public"]["Enums"]["activity_event_type"];
+        };
+        Update: {
+          actor_id?: string | null;
+          created_at?: string;
+          entity_id?: string;
+          entity_type?: Database["public"]["Enums"]["activity_entity_type"];
+          household_id?: string;
+          id?: string;
+          summary?: NonNullable<Json>;
+          type?: Database["public"]["Enums"]["activity_event_type"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "activity_events_actor_id_fkey";
+            columns: ["actor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "activity_events_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       household_members: {
         Row: {
           household_id: string;
@@ -59,6 +108,7 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string;
+          creation_key: string | null;
           currency_code: string;
           id: string;
           name: string;
@@ -69,6 +119,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by: string;
+          creation_key?: string | null;
           currency_code?: string;
           id?: string;
           name: string;
@@ -78,6 +129,7 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string;
+          creation_key?: string | null;
           currency_code?: string;
           id?: string;
           name?: string;
@@ -176,9 +228,58 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      accept_invite: {
+        Args: { token: string };
+        Returns: {
+          already_member: boolean;
+          joined_household_id: string;
+        }[];
+      };
+      create_household: {
+        Args: {
+          currency: string;
+          household_name: string;
+          request_key?: string;
+          time_zone: string;
+        };
+        Returns: string;
+      };
+      delete_household: {
+        Args: { target_household_id: string };
+        Returns: undefined;
+      };
+      get_invite_preview: {
+        Args: { token: string };
+        Returns: {
+          household_id: string;
+          household_name: string;
+          inviter_name: string;
+          status: string;
+        }[];
+      };
+      leave_household: {
+        Args: { target_household_id: string };
+        Returns: undefined;
+      };
+      remove_member: {
+        Args: { member_user_id: string; target_household_id: string };
+        Returns: undefined;
+      };
+      transfer_ownership: {
+        Args: { new_owner_user_id: string; target_household_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
+      activity_entity_type: "household" | "household_member" | "invitation";
+      activity_event_type:
+        | "household_created"
+        | "member_joined"
+        | "member_left"
+        | "member_removed"
+        | "ownership_transferred"
+        | "invitation_created"
+        | "invitation_revoked";
       household_role: "owner" | "member";
     };
     CompositeTypes: {
@@ -307,6 +408,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      activity_entity_type: ["household", "household_member", "invitation"],
+      activity_event_type: [
+        "household_created",
+        "member_joined",
+        "member_left",
+        "member_removed",
+        "ownership_transferred",
+        "invitation_created",
+        "invitation_revoked",
+      ],
       household_role: ["owner", "member"],
     },
   },

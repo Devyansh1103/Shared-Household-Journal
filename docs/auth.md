@@ -24,7 +24,10 @@ Built in Phase 5. Supabase Auth with email and password (A3), sessions in cookie
 | `/sign-in`         | Public    | Email and password. Honours a safe `?next=`. Signed-in visitors are sent on.                  |
 | `/forgot-password` | Public    | Requests a reset link. Always the same neutral answer.                                        |
 | `/auth/confirm`    | Public    | Email link handler (`type=email` → `/home?confirmed=1`, `type=recovery` → `/reset-password`). |
-| `/home`            | Signed in | Welcome page. Says plainly that households aren't available yet.                              |
+| `/home`            | Signed in | Welcome page and the list of your households (or an empty state).                             |
+| `/households/new`  | Signed in | Create a household (name, currency, timezone). Phase 6.                                       |
+| `/households/[id]` | Member    | Household overview: details, members, invite links, leave/delete. Non-members get a 404.      |
+| `/invite/[token]`  | Public    | Signed out: asks to sign in, reveals nothing. Signed in: preview and "Join household".        |
 | `/profile`         | Signed in | Edit display name. Shows your own email (read-only).                                          |
 | `/reset-password`  | Signed in | Set a new password (reached from the recovery email).                                         |
 

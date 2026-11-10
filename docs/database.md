@@ -30,9 +30,44 @@ New migrations: `npx supabase migration new <name>`, then apply locally with
 | `household_members` | Membership history         | `role` enum `owner`/`member` (D3). One active row per user per household; at most one active owner (partial unique indexes); an owner can't have `left_at`; at least one active owner while there are active members (deferred constraint trigger). |
 | `invitations`       | Invite links (D5)          | `token_hash` unique, lowercase hex SHA-256. Defaults: expires in 7 days, `max_uses` 10. `0 ≤ use_count ≤ max_uses`. `created_by` defaults to `auth.uid()`.                                                                                          |
 
+## Tables and columns (Phase 6)
+
+| Table / column            | Purpose                                     | Key constraints                                                                                                                                                                                                                                    |
+| ------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `households.creation_key` | Makes `create_household` idempotent         | Unique per (`created_by`, `creation_key`) when not null. The create form sends a fresh uuid per page visit, so a repeated submission returns the first household.                                                                                  |
+| `activity_events`         | Append-only household journal (feed UI: 13) | `type` enum `activity_event_type`, `entity_type` enum `activity_entity_type`, `summary` must be a JSON object (ids and minimal context only, no emails or tokens). `actor_id` is null only for changes made outside a user session (service role). |
+
+Events written so far: `household_created`, `member_joined`, `member_left`, `member_removed`,
+`ownership_transferred` (from the functions below) and `invitation_created`, `invitation_revoked`
+(from the `invitations_log_activity` trigger). A `before update or delete` trigger rejects every
+change, for every role, except the cascade from deleting the household itself.
+
+## Functions (Phase 6)
+
+All are `SECURITY DEFINER` with `search_path = ''`, executable by `authenticated` only (EXECUTE is
+revoked from `anon` and `public`). Each takes the caller from `auth.uid()`, never from an argument.
+
+| Function                                                              | Who                     | What                                                                                                                                                                     |
+| --------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `create_household(household_name, currency, time_zone, request_key?)` | Any signed-in user      | Inserts the household and the caller's `owner` membership in one transaction. A repeated `request_key` returns the existing household.                                   |
+| `get_invite_preview(token)`                                           | Any signed-in user      | `valid` + household name + inviter's display name; `member` + household id if already in; otherwise `invalid` with nothing else.                                         |
+| `accept_invite(token)`                                                | Any signed-in user      | Locks the invite row, checks revocation, expiry and use limit, inserts a `member` row, increments `use_count`. Already a member: returns the household, consumes no use. |
+| `leave_household(household_id)`                                       | Active non-owner member | Sets `left_at`, revokes the leaver's still-active invites. The owner gets `HJ002`.                                                                                       |
+| `remove_member(household_id, user_id)`                                | Owner                   | Sets the member's `left_at`, revokes their still-active invites.                                                                                                         |
+| `transfer_ownership(household_id, user_id)`                           | Owner                   | Demotes the caller to `member`, promotes the target (an active member) to `owner`.                                                                                       |
+| `delete_household(household_id)`                                      | Owner, only member left | Deletes the household (D14). Memberships, invitations and events cascade.                                                                                                |
+
+Invite tokens: 32 random bytes as unpadded base64url (43 characters). The app stores
+`sha256(raw bytes)` as hex; `private.invite_token_hash(token)` computes the same hash on redemption,
+so the raw token never needs to reach the database and the stored hash can't be used to join.
+
+Error codes (mapped to messages in `src/lib/households/errors.ts`): `HJ001` invite not valid,
+`HJ002` owner must transfer first, `HJ003` target isn't an active member, `HJ004` other members
+remain, `HJ005` can't target yourself, `42501` not signed in / not a member / not the owner.
+
 Deletion behaviour:
 
-- `households` → `household_members`, `invitations`: **cascade** (D14: deleting a household is permanent).
+- `households` → `household_members`, `invitations`, `activity_events`: **cascade** (D14: deleting a household is permanent).
 - Everything → `profiles`, and `profiles` → `auth.users`: **restrict**. Deleting an auth user fails while
   their profile exists. The anonymising account-deletion flow is Phase 18 (D14).
 
@@ -62,8 +97,9 @@ Helpers live in the `private` schema, which the Data API does not expose. All ar
 | Table               | Select                                                       | Insert                                                                      | Update                                                                  | Delete |
 | ------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------ |
 | `profiles`          | Self, and anyone who shares (or shared) a household with you | Trigger only                                                                | Self; `display_name`, `avatar_url` only                                 | No     |
-| `households`        | Active members                                               | No (Phase 6 `create_household`)                                             | Owner; `name`, `currency_code`, `timezone` only                         | No     |
-| `household_members` | Active members of that household (all rows, incl. left)      | No (Phase 6 functions)                                                      | No                                                                      | No     |
+| `households`        | Active members                                               | No (`create_household`)                                                     | Owner; `name`, `currency_code`, `timezone` only                         | No     |
+| `household_members` | Active members of that household (all rows, incl. left)      | No (functions only)                                                         | No                                                                      | No     |
+| `activity_events`   | Active members                                               | No (functions and triggers only)                                            | No                                                                      | No     |
 | `invitations`       | Active members                                               | Active members; `household_id`, `token_hash`, `expires_at`, `max_uses` only | Set `revoked_at` on an unrevoked invite: its creator, or the owner (D4) | No     |
 
 "No" means there is no policy **and** no table privilege, so the request fails with `42501`.
@@ -73,7 +109,9 @@ Members who leave or are removed lose access immediately, because every check re
 
 ## Not built yet
 
-- `create_household`, `accept_invite`, `leave_household` and the ownership transfer (Phase 6).
-- Invitation caps: the DB enforces `max_uses > 0` and expiry after creation, but no upper bound.
-  Whether D5's 7 days and 10 uses are caps or only defaults is decided in Phase 6.
+- **D13 zero-balance check in `leave_household`.** No balances exist until expenses do, so every
+  balance is zero today. It must be added to `leave_household` with the expenses table (Phase 8/9).
+- Invitation caps (O6, still Open): the DB enforces `max_uses > 0` and expiry after creation, but no
+  upper bound. The app always uses the defaults (7 days, 10 uses) and offers no other values, but a
+  member calling the Data API directly can still insert other values, as since Phase 4.
 - Currency lock once an expense exists (Phase 8).

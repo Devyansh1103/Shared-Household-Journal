@@ -80,7 +80,7 @@ Never record an unconfirmed assumption here as a fact.
 
 ## Repository facts
 
-Last verified: 2026-11-04, after Phase 5.
+Last verified: 2026-11-10, after Phase 6.
 
 **Stack**
 
@@ -96,13 +96,14 @@ Last verified: 2026-11-04, after Phase 5.
 
 - `/`: public landing page with sign-up and sign-in links.
 - `/sign-in`, `/sign-up`, `/forgot-password`, `/auth/confirm`: public auth routes.
-- `/home`, `/profile`, `/reset-password`: signed-in routes (`(app)` group). See [auth.md](auth.md).
+- `/home`, `/profile`, `/reset-password`, `/households/new`, `/households/[householdId]`: signed-in routes (`(app)` group). See [auth.md](auth.md).
+- `/invite/[token]`: invite links (in the `(auth)` group for its layout; signed-out visitors see no household details).
 - `/dev/design-system`: development only; returns 404 in production.
 
 **Data**
 
 - **Database/auth provider:** Supabase, local only (Docker, Postgres 17, Auth with email confirmation and Mailpit). Supabase CLI 3.0.0 is a dev dependency; `@supabase/supabase-js` 2.118, `@supabase/ssr` 0.12 and `zod` 4.6 are installed. No hosted project is linked (O1).
-- **Schema/migration location:** [supabase/migrations/](../supabase/migrations/). Phase 4 tables: `profiles`, `households`, `household_members`, `invitations`. See [database.md](database.md).
+- **Schema/migration location:** [supabase/migrations/](../supabase/migrations/). Phase 4 tables: `profiles`, `households`, `household_members`, `invitations`. Phase 6 adds `activity_events` and the membership functions. See [database.md](database.md).
 - **Generated types:** `src/lib/supabase/database.types.ts` (`npm run db:types`).
 
 **Commands**
@@ -112,7 +113,7 @@ Last verified: 2026-11-04, after Phase 5.
 
 **Status**
 
-- **Implemented features:** the UI foundation, the Phase 4 database foundation, and Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing).
+- **Implemented features:** the UI foundation, the Phase 4 database foundation, Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing), and Phase 6 households (create, list, overview, members, invite links, join, leave, remove, transfer ownership, delete when alone). No emails are sent for invites; links are copied and shared by hand.
 - **Not done:** Phase 3 (application shell). A minimal signed-in header stands in for it.
 - **Resolved:**
   - `npx` works.

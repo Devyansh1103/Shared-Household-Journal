@@ -47,14 +47,16 @@ All Confirmed entries below were approved by the project owner on **2026-11-02**
 
 ## Open items
 
-| ID  | Item                                                                                                                                                                          | Status    | Needed by |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
-| O1  | Production hosting. Vercel + hosted Supabase is suggested.                                                                                                                    | Open      | Phase 18  |
-| O2  | Data-retention periods                                                                                                                                                        | Open      | Phase 18  |
-| O3  | Who may edit budgets. Proposed: owner only.                                                                                                                                   | Proposed  | Phase 16  |
-| O4  | Supabase public key: the **publishable** key, as `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (with `NEXT_PUBLIC_SUPABASE_URL`). Resolved 2026-11-04.                               | Confirmed | Phase 5   |
-| O5  | Whether React Hook Form is needed for the split editor                                                                                                                        | Open      | Phase 8   |
-| O6  | D5 says invites default to 7 days and 10 uses. Are those also maximums a member cannot exceed? The database currently enforces only `max_uses > 0` and expiry after creation. | Open      | Phase 6   |
+| ID  | Item                                                                                                                                                                                                                                       | Status    | Needed by |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- | --------- |
+| O1  | Production hosting. Vercel + hosted Supabase is suggested.                                                                                                                                                                                 | Open      | Phase 18  |
+| O2  | Data-retention periods                                                                                                                                                                                                                     | Open      | Phase 18  |
+| O3  | Who may edit budgets. Proposed: owner only.                                                                                                                                                                                                | Proposed  | Phase 16  |
+| O4  | Supabase public key: the **publishable** key, as `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (with `NEXT_PUBLIC_SUPABASE_URL`). Resolved 2026-11-04.                                                                                            | Confirmed | Phase 5   |
+| O5  | Whether React Hook Form is needed for the split editor                                                                                                                                                                                     | Open      | Phase 8   |
+| O6  | D5 says invites default to 7 days and 10 uses. Are those also maximums a member cannot exceed? The database currently enforces only `max_uses > 0` and expiry after creation. Phase 6 left this open: the app only ever uses the defaults. | Open      | Phase 6   |
+| O7  | Should a removed member be blocked from rejoining? Today their own invite links are revoked on removal, but they can rejoin with any other active link. Raised in Phase 6.                                                                 | Open      | Phase 17  |
+| O8  | Can the owner remove a member whose balance isn't zero (D13 covers only leaving)? Moot until balances exist. Raised in Phase 6.                                                                                                            | Open      | Phase 9   |
 
 ## Details
 
