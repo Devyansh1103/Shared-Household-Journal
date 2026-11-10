@@ -1,7 +1,8 @@
 // Main navigation for the signed-in shell (Phase 3). Only routes that exist are
 // listed; each feature phase adds its own entry when its pages ship.
 
-export type NavItemKey = "home" | "household" | "expenses" | "profile";
+export type NavItemKey =
+  "home" | "household" | "expenses" | "balances" | "profile";
 
 export type NavItem = {
   key: NavItemKey;
@@ -29,6 +30,12 @@ export function navItems(currentHouseholdId?: string | null): NavItem[] {
         key: "expenses",
         href: `${base}/expenses`,
         label: "Expenses",
+        matchSubpaths: true,
+      },
+      {
+        key: "balances",
+        href: `${base}/balances`,
+        label: "Balances",
         matchSubpaths: true,
       },
     );

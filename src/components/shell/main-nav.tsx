@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { HouseIcon, ReceiptIcon, UserRoundIcon, UsersIcon } from "lucide-react";
+import {
+  HouseIcon,
+  ReceiptIcon,
+  ScaleIcon,
+  UserRoundIcon,
+  UsersIcon,
+} from "lucide-react";
 import { cn } from "cn";
 import {
   currentHousehold,
@@ -15,6 +21,7 @@ const ICONS: Record<NavItemKey, typeof HouseIcon> = {
   home: HouseIcon,
   household: UsersIcon,
   expenses: ReceiptIcon,
+  balances: ScaleIcon,
   profile: UserRoundIcon,
 };
 
@@ -23,6 +30,7 @@ const BOTTOM_COLUMNS: Record<number, string> = {
   2: "grid-cols-2",
   3: "grid-cols-3",
   4: "grid-cols-4",
+  5: "grid-cols-5",
 };
 
 /**
@@ -86,7 +94,7 @@ export function MainNav({
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex h-16 flex-col items-center justify-center gap-1 px-2 text-xs font-medium text-muted-foreground hover:bg-muted",
+                  "relative flex h-16 flex-col items-center justify-center gap-1 px-1 text-xs font-medium text-muted-foreground hover:bg-muted",
                   active &&
                     "font-semibold text-primary before:absolute before:top-0 before:left-1/2 before:h-1 before:w-10 before:-translate-x-1/2 before:rounded-b-full before:bg-primary",
                 )}

@@ -80,7 +80,7 @@ Never record an unconfirmed assumption here as a fact.
 
 ## Repository facts
 
-Last verified: 2026-11-11, after Phases 7–8.
+Last verified: 2026-11-10, after roadmap Phase 9 (balances).
 
 **Stack**
 
@@ -97,13 +97,15 @@ Last verified: 2026-11-11, after Phases 7–8.
 - `/`: public landing page with sign-up and sign-in links.
 - `/sign-in`, `/sign-up`, `/forgot-password`, `/auth/confirm`: public auth routes.
 - `/home`, `/profile`, `/reset-password`, `/households/new`, `/households/[householdId]`: signed-in routes (`(app)` group). See [auth.md](auth.md).
+- `/households/[householdId]/expenses` (with `/new`, `/[expenseId]` and `/[expenseId]/edit`): expenses (Phase 8).
+- `/households/[householdId]/balances` and `/households/[householdId]/balances/[userId]`: balances and one person's explanation (Phase 9).
 - `/invite/[token]`: invite links (in the `(auth)` group for its layout; signed-out visitors see no household details).
 - `/dev/design-system`: development only; returns 404 in production.
 
 **Data**
 
 - **Database/auth provider:** Supabase, local only (Docker, Postgres 17, Auth with email confirmation and Mailpit). Supabase CLI 3.0.0 is a dev dependency; `@supabase/supabase-js` 2.118, `@supabase/ssr` 0.12 and `zod` 4.6 are installed. No hosted project is linked (O1).
-- **Schema/migration location:** [supabase/migrations/](../supabase/migrations/). Phase 4 tables: `profiles`, `households`, `household_members`, `invitations`. Phase 6 adds `activity_events` and the membership functions. See [database.md](database.md).
+- **Schema/migration location:** [supabase/migrations/](../supabase/migrations/). Phase 4 tables: `profiles`, `households`, `household_members`, `invitations`. Phase 6 adds `activity_events` and the membership functions. Phase 8 adds `expenses` and `expense_splits`; Phase 9 adds the balance functions (no tables). See [database.md](database.md).
 - **Generated types:** `src/lib/supabase/database.types.ts` (`npm run db:types`).
 
 **Commands**
@@ -114,7 +116,7 @@ Last verified: 2026-11-11, after Phases 7–8.
 
 **Status**
 
-- **Implemented features:** the UI foundation, the Phase 4 database foundation, Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing), and Phase 6 households (create, list, overview, members, invite links, join, leave, remove, transfer ownership, delete when alone). No emails are sent for invites; links are copied and shared by hand. Phases 7–8 (2026-11-11): the split engine (`src/domain/money/`) and expenses (add, view, edit, soft delete, owner restore) with equal, percentage and custom splits. Balances and settlements are not built yet. Phase 9 hardened the engine: ISO 4217 decimal places pinned in code, structured error codes, seeded property tests and a database cross-check (see [money.md](money.md)).
+- **Implemented features:** the UI foundation, the Phase 4 database foundation, Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing), and Phase 6 households (create, list, overview, members, invite links, join, leave, remove, transfer ownership, delete when alone). No emails are sent for invites; links are copied and shared by hand. Phases 7–8 (2026-11-11): the split engine (`src/domain/money/`) and expenses (add, view, edit, soft delete, owner restore) with equal, percentage and custom splits. The split engine was then hardened: ISO 4217 decimal places pinned in code, structured error codes, seeded property tests and a database cross-check (see [money.md](money.md)). Roadmap Phase 9 (2026-11-10): balances derived in SQL and checked against a TypeScript reference, with an overview (who owes whom, everyone's balance, how the totals add up) and a per-person explanation listing the expenses behind it. Settlements are not built yet (Phase 10).
 - **Phase 3 (application shell)** was built after Phase 6, on 2026-11-10: sidebar from 1024px, top bar and bottom tab bar below. See [design-system.md](design-system.md#application-shell).
 - **Resolved:**
   - `npx` works.

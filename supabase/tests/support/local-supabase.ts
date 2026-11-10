@@ -2,7 +2,9 @@
 // Keys are read from `supabase status` at runtime and kept in memory only:
 // they are never written to disk or printed.
 
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -90,4 +92,50 @@ export async function signedInClient(
   const { error } = await client.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return client;
+}
+
+/**
+ * Runs SQL with psql as `postgres` inside the local database container. Only
+ * for checks the Data API can't reach, such as data that breaks a deferred
+ * constraint inside a transaction that is never committed. Output is returned,
+ * never printed; it contains no keys.
+ */
+export function psqlAsSuperuser(sql: string): {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+} {
+  // Test runners start in the repository root.
+  const config = readFileSync(
+    path.join(process.cwd(), "supabase", "config.toml"),
+    "utf8",
+  );
+  const projectId = /^project_id\s*=\s*"([^"]+)"/m.exec(config)?.[1];
+  if (!projectId)
+    throw new Error("project_id not found in supabase/config.toml");
+
+  const result = spawnSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      `supabase_db_${projectId}`,
+      "psql",
+      "-X",
+      "-q",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+    ],
+    { input: sql, encoding: "utf8" },
+  );
+  if (result.error) throw result.error;
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }

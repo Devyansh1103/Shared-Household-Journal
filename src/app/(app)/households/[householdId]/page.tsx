@@ -124,6 +124,19 @@ async function HouseholdContent({
       </Section>
 
       <Section
+        title="Balances"
+        description="Who has paid what, and who owes whom, worked out from the expenses."
+      >
+        <div>
+          <Button variant="outline" asChild>
+            <Link href={`/households/${household.id}/balances`}>
+              View balances
+            </Link>
+          </Button>
+        </div>
+      </Section>
+
+      <Section
         title="Members"
         description={
           members.length === 1

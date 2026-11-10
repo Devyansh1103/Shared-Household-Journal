@@ -396,6 +396,10 @@ export type Database = {
           status: string;
         }[];
       };
+      household_balances: {
+        Args: { focus_user_id?: string; target_household_id: string };
+        Returns: Json;
+      };
       leave_household: {
         Args: { target_household_id: string };
         Returns: undefined;

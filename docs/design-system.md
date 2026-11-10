@@ -76,6 +76,7 @@ Typography roles are `type-*` utilities. They are deliberately not named `text-*
 ## Money and dates
 
 - `<Amount minor={…} currency="INR" tone? size? />` formats integer minor units with `en-IN` grouping, for example ₹1,23,45,678.90. It never converts through floating point, and it shows exactly the currency's ISO 4217 decimal places (see [money.md](money.md)), the same in every browser. Tones are `neutral`, `positive`, `negative` and `muted`. A tone is only a hint, so always state the direction in words.
+- **Balances** use the sign convention in [money.md](money.md#balances): positive is owed, negative owes. In running text, `formatBalance` keeps the sign and the amount on one line. Rows that pair a name with large amounts must wrap, not overlap, on a 320px screen.
 - `formatDate("YYYY-MM-DD")` formats a calendar date without shifting it across timezones.
 - `formatDateTime(instant, timeZone)` formats an instant in the household's timezone (decision D11).
 
@@ -99,7 +100,7 @@ Built in Phase 3 (after Phase 6). Signed-in pages (`src/app/(app)/layout.tsx`) g
 | ≥ 1024px (`lg`) | Sticky 256px sidebar: logo, household switcher, main nav, and account (name → Profile, Sign out) at the foot.                  |
 | < 1024px        | Sticky top bar (logo, household switcher) and a fixed bottom tab bar with icon + text labels. Sign out is on the Profile page. |
 
-- **Main nav** ([src/lib/navigation.ts](../src/lib/navigation.ts), unit-tested): Home, Household (only inside one of your households), Profile. Only routes that exist are listed (D23); each feature phase adds its entry with its pages.
+- **Main nav** ([src/lib/navigation.ts](../src/lib/navigation.ts), unit-tested): Home; then Household, Expenses and Balances (only inside one of your households); then Profile. Only routes that exist are listed (D23); each feature phase adds its entry with its pages. The bottom bar fits five labelled tabs at 360px (checked in `e2e/balances.spec.ts`).
 - **Active item:** `aria-current="page"`, a heavier weight and an indicator bar, so it never relies on colour alone.
 - **Household switcher** ([src/components/shell/household-switcher.tsx](../src/components/shell/household-switcher.tsx)): the current household is read from the URL (`/households/[householdId]`) and is shown only if it's one of yours. Switching is plain navigation, so each page loads its own data on the server. Nothing is stored in the browser.
 - **Fresh after changes:** actions that change your list of households (create, join, leave, delete) call `revalidatePath("/", "layout")` before redirecting.
@@ -132,6 +133,7 @@ Built in Phase 3 (after Phase 6). Signed-in pages (`src/app/(app)/layout.tsx`) g
 **Project components**
 
 - `StatusBadge`: icon plus label for `success`, `warning`, `danger`, `info` and `neutral`.
+- `BalanceBadge` and `BalanceAmount` ([src/components/balance.tsx](../src/components/balance.tsx)): a balance's direction as an icon and a word ("Owed", "Owes", "Settled up"), and the signed amount toned to match. The direction is always in words too, and the sign is always shown, so colour is never the only signal.
 - `EmptyState`: icon, title, description and a "next step" action.
 - `ErrorState`: an alert that explains what happened and what to do next, with an optional recovery action.
 

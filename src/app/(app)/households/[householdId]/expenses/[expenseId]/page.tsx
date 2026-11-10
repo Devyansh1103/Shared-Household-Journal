@@ -143,8 +143,20 @@ async function ExpenseDetail({
           ))}
         </ul>
         <p className="type-help">
-          Shares always add up exactly to the amount. Balances between members
-          come in a later update.
+          {deleted ? (
+            "Shares always add up exactly to the amount."
+          ) : (
+            <>
+              Shares always add up exactly to the amount, and each one counts
+              towards that person&apos;s balance.{" "}
+              <Link
+                href={`/households/${household.id}/balances`}
+                className="rounded-sm text-primary underline underline-offset-4"
+              >
+                See balances
+              </Link>
+            </>
+          )}
         </p>
       </Section>
 
@@ -153,7 +165,8 @@ async function ExpenseDetail({
           {expense.everyoneActive ? null : (
             <p className="type-secondary">
               Someone in this expense has left the household, so it can&apos;t
-              be edited. It can still be deleted.
+              be edited. It can still be deleted, but then it can&apos;t be
+              restored, and their balance changes.
             </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -168,7 +181,11 @@ async function ExpenseDetail({
             <ConfirmActionDialog
               triggerLabel="Delete expense"
               title={`Delete “${expense.description}”?`}
-              description="It stops counting straight away and moves to “Deleted expenses”. The household owner can restore it."
+              description={
+                expense.everyoneActive
+                  ? "It stops counting straight away and moves to “Deleted expenses”. The household owner can restore it."
+                  : "It stops counting straight away and moves to “Deleted expenses”. Someone in it has left the household, so it can't be restored, and their balance will change."
+              }
               confirmLabel="Delete expense"
               cancelLabel="Keep expense"
               pendingLabel="Deleting…"

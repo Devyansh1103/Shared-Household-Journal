@@ -9,18 +9,19 @@ describe("navItems", () => {
     expect(navItems(null).map((i) => i.key)).toEqual(["home", "profile"]);
   });
 
-  it("adds the current household and its expenses between Home and Profile", () => {
+  it("adds the current household, its expenses and balances between Home and Profile", () => {
     expect(navItems(HOUSEHOLD).map((i) => i.href)).toEqual([
       "/home",
       `/households/${HOUSEHOLD}`,
       `/households/${HOUSEHOLD}/expenses`,
+      `/households/${HOUSEHOLD}/balances`,
       "/profile",
     ]);
   });
 });
 
 describe("isActive", () => {
-  const [home, household, expenses, profile] = navItems(HOUSEHOLD);
+  const [home, household, expenses, balances, profile] = navItems(HOUSEHOLD);
 
   it("matches exact paths, ignoring a trailing slash", () => {
     expect(isActive(home, "/home")).toBe(true);
@@ -29,9 +30,9 @@ describe("isActive", () => {
     expect(isActive(home, "/profile")).toBe(false);
   });
 
-  it("marks exactly one of Household and Expenses inside a household", () => {
+  it("marks exactly one of Household, Expenses and Balances inside a household", () => {
     const at = (path: string) =>
-      [household, expenses]
+      [household, expenses, balances]
         .filter((item) => isActive(item, path))
         .map((i) => i.key);
     expect(at(`/households/${HOUSEHOLD}`)).toEqual(["household"]);
@@ -40,6 +41,8 @@ describe("isActive", () => {
     expect(at(`/households/${HOUSEHOLD}/expenses/abc/edit`)).toEqual([
       "expenses",
     ]);
+    expect(at(`/households/${HOUSEHOLD}/balances`)).toEqual(["balances"]);
+    expect(at(`/households/${HOUSEHOLD}/balances/abc`)).toEqual(["balances"]);
     expect(at(`/households/${HOUSEHOLD}x`)).toEqual([]);
     expect(at("/households/new")).toEqual([]);
   });

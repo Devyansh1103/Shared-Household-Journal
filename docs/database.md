@@ -102,12 +102,12 @@ Functions (all `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` for `authentica
 as amended). Each takes the caller from `auth.uid()` and writes an `activity_events` row with old
 and new values (D6):
 
-| Function                                                                                                                 | Who                          | What                                                                                                                                                           |
-| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `create_expense(target_household_id, title, amount, expense_category, spent_on, payer_id, method, shares, request_key?)` | Active member                | Payer and every participant must be active members. `shares` is `[{user_id, share_minor, percentage_bp}]`. A repeated `request_key` returns the first expense. |
-| `update_expense(target_expense_id, …same fields…, expected_updated_at?)`                                                 | Creator, payer or owner (D6) | Replaces every field and the whole split. Refuses deleted expenses, and refuses with `HJ010` if `updated_at` changed since the form loaded.                    |
-| `delete_expense(target_expense_id)`                                                                                      | Creator, payer or owner (D6) | Soft delete (D7): sets `deleted_at`/`deleted_by`; the row and its splits stay readable.                                                                        |
-| `restore_expense(target_expense_id)`                                                                                     | Owner (D7)                   | Clears the delete. Refused if the payer or a participant has since left.                                                                                       |
+| Function                                                                                                                 | Who                          | What                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_expense(target_household_id, title, amount, expense_category, spent_on, payer_id, method, shares, request_key?)` | Active member                | Payer and every participant must be active members. `shares` is `[{user_id, share_minor, percentage_bp}]`. A repeated `request_key` returns the first expense.                                                                |
+| `update_expense(target_expense_id, …same fields…, expected_updated_at?)`                                                 | Creator, payer or owner (D6) | Replaces every field and the whole split. Refuses deleted expenses, refuses with `HJ010` if `updated_at` changed since the form loaded, and (since Phase 9, D24) refuses with `HJ007` if the payer or a participant has left. |
+| `delete_expense(target_expense_id)`                                                                                      | Creator, payer or owner (D6) | Soft delete (D7): sets `deleted_at`/`deleted_by`; the row and its splits stay readable.                                                                                                                                       |
+| `restore_expense(target_expense_id)`                                                                                     | Owner (D7)                   | Clears the delete. Refused if the payer or a participant has since left.                                                                                                                                                      |
 
 Other rules added in Phase 8:
 
@@ -115,11 +115,36 @@ Other rules added in Phase 8:
   household has any expense, deleted ones included.
 - **Zero balance to leave or be removed (D13, O8):** `leave_household` and `remove_member` now
   refuse with `HJ006` while `private.member_net_minor` (paid minus shares, over non-deleted
-  expenses) isn't zero. Settlements join that sum in Phase 10.
+  expenses) isn't zero. Since Phase 9 it uses the same definition as the balances people see
+  (below).
 
 Error codes: `HJ006` balance not zero, `HJ007` payer or participant not an active member, `HJ008`
 invalid split, `HJ009` no such expense (also for other households' ids), `HJ010` changed since
 loaded, `HJ011` deleted / not deleted, `HJ012` currency locked.
+
+## Balances (roadmap Phase 9)
+
+Migration `20261113120000_balances.sql`. Balances are worked out from the records on every read
+and are never stored (FR-05, ADR-005). The rules and sign convention are in
+[money.md](money.md#balances).
+
+| Function                                                  | Kind                                               | What                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `household_balances(target_household_id, focus_user_id?)` | `security invoker`, `stable`; `authenticated` only | Raises `42501` unless the caller is an active member; RLS applies as well. Returns JSON: the counted expenses and their total, every person's paid / share / net, the pairs (who owes whom), and, with `focus_user_id`, the counted expenses behind that person's balance (newest 200, plus the full count). Money is text. |
+| `private.balance_people(household_id)`                    | `security invoker`, `stable`                       | The one definition of a balance: per person, paid and shares over non-deleted expenses. Covers active members and anyone else in a counted expense (someone who has left). Sums are `numeric`.                                                                                                                              |
+| `private.assert_balances_reconcile(household_id)`         | `security invoker`, `stable`                       | Raises `HJ013` (DETAIL = expense id) if a counted expense has no participants or its shares don't add up to its amount.                                                                                                                                                                                                     |
+| `private.member_net_minor(household_id, user_id)`         | Replaced; still `SECURITY DEFINER`                 | Now `assert_balances_reconcile`, then paid − shares from `balance_people`. Used by `leave_household` and `remove_member`.                                                                                                                                                                                                   |
+| `update_expense(…)`                                       | Replaced; same signature and grants                | Also refuses (`HJ007`) an expense whose payer or a participant has left (D24). `delete_expense` is unchanged: deleting such an expense is allowed.                                                                                                                                                                          |
+
+- **One snapshot.** `household_balances` is `stable`, so every part of the answer is read from the
+  same snapshot and the parts agree. The app checks that they do (`checkBalances`, `checkEntries`).
+- **Access.** The two private helpers are `EXECUTE` for `authenticated`, because the invoker
+  function needs them. The `private` schema isn't exposed through the Data API, so they can't be
+  called directly (PostgREST answers `PGRST106`).
+- **Money as text.** Totals aren't capped like a single expense, and JSON numbers are doubles.
+- **No new tables, no stored balances, no data changes.**
+
+New error code: `HJ013` balances can't be calculated (a counted expense doesn't add up).
 
 ## Access control
 
@@ -155,7 +180,8 @@ Members who leave or are removed lose access immediately, because every check re
 - Invitation caps (O6, still Open): the DB enforces `max_uses > 0` and expiry after creation, but no
   upper bound. The app always uses the defaults (7 days, 10 uses) and offers no other values, but a
   member calling the Data API directly can still insert other values, as since Phase 4.
-- Settlements (Phase 10): `member_net_minor` must include them when they arrive.
-- Pairwise balances shown to people (Phase 9).
+- Settlements (Phase 10): add them to `private.balance_people` and to the pairs in
+  `household_balances`; `member_net_minor` follows automatically. How a former member's balance is
+  settled is open (O9).
 - `expenses.recurring_bill_id` / `recurrence_period` and their unique key arrive with recurring
   bills (Phase 14).

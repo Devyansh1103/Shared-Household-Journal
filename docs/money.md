@@ -1,9 +1,10 @@
-# Money and splits
+# Money, splits and balances
 
-How amounts are represented, parsed, split and shown. Decisions: D1, D2 in
-[decisions.md](decisions.md); [ADR-003](adr/003-money-representation.md) (representation),
-[ADR-004](adr/004-split-rounding.md) (rounding), [ADR-006](adr/006-atomic-writes.md) (writes).
-Code: [src/domain/money/](../src/domain/money/) and [src/lib/format.ts](../src/lib/format.ts).
+How amounts are represented, parsed, split, added up into balances and shown. Decisions: D1, D2,
+D24 in [decisions.md](decisions.md); [ADR-003](adr/003-money-representation.md) (representation),
+[ADR-004](adr/004-split-rounding.md) (rounding), [ADR-005](adr/005-derived-balances.md)
+(balances), [ADR-006](adr/006-atomic-writes.md) (writes). Code: [src/domain/money/](../src/domain/money/),
+[src/lib/balances/](../src/lib/balances/) and [src/lib/format.ts](../src/lib/format.ts).
 
 ## Representation
 
@@ -124,8 +125,64 @@ single units differently, at most one unit per share, and everyone in the househ
 | [form.test.ts](../src/lib/expenses/form.test.ts)                                                                       | Server-side validation with members and currency                                                                                                                                                  |
 | [split-engine.test.ts](../supabase/tests/split-engine.test.ts), [expenses.test.ts](../supabase/tests/expenses.test.ts) | The database stores exactly what the engine produces and refuses broken splits                                                                                                                    |
 
-## For balances (next phase)
+## Balances
 
-Balances add up many expenses, so a balance can exceed the per-expense limit. Sum in SQL (`bigint`
-or `numeric`), send totals as **text**, and parse them with `BigInt`. Don't send them as JSON numbers.
-`private.member_net_minor` already sums in SQL; settlements must be added to it (Phase 10).
+Roadmap Phase 9 (ADR-005, D7, D24). Balances are worked out from the records every time they're
+shown, and never stored.
+
+**Sign convention, everywhere:** `net = paid − shares`.
+
+| Net      | Meaning                                            | Shown as                                      |
+| -------- | -------------------------------------------------- | --------------------------------------------- |
+| Positive | The person should get money back (others owe them) | "Owed", "+₹600.00", "should get back ₹600.00" |
+| Negative | The person owes money                              | "Owes", "-₹300.00", "owes ₹300.00"            |
+| Zero     | Settled up                                         | "Settled up", "₹0.00"                         |
+
+- **Paid** is the whole amount of each counted expense the person paid for. **Share** is their split
+  of each counted expense. **Counted** means not deleted (D7).
+- **Pairs:** each participant owes the payer their share, and a payer's own share isn't owed to
+  anyone. Between two people the two directions offset, so each pair shows one amount owed one way.
+  Nothing moves between pairs: that would be debt simplification (Phase 21).
+- **One currency:** a household has one currency, locked once it has an expense (D1). Balances are
+  per household, so amounts in different currencies never meet. There's no conversion.
+- **People who have left** stay in the balances while they're in counted expenses, shown as
+  "(left)" (D13). They left at zero (D13, O8), and expenses involving them can't be edited or
+  restored, so their balance changes only if one is deleted (D24). Settling it is open (O9).
+- **Settlements** join in Phase 10: `net = paid − shares + settlements paid − settlements received`.
+
+### Invariants, and who checks them
+
+| Invariant                                          | Database                                              | App, before anything is shown                              |
+| -------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------- |
+| Each counted expense's shares add up to its amount | Write triggers; `assert_balances_reconcile` (`HJ013`) | `computeBalances` (`not_reconciled`)                       |
+| Each net is paid − shares                          | Computed that way                                     | `checkBalances` (`net_mismatch`)                           |
+| The nets add up to exactly zero                    | Follows from the above                                | `checkBalances` (`not_zero_sum`)                           |
+| Payments and shares each add up to the total spent | Follows from the above                                | `checkBalances` (`totals_mismatch`)                        |
+| Who owes whom adds up to each person's net         | Computed from the same rows                           | `checkBalances` (`pairs_mismatch`, `invalid_pair`)         |
+| The expenses listed behind a balance add up to it  | Same snapshot                                         | `checkEntries` (`entries_mismatch`)                        |
+| No expense counted twice; one household only       | One query per household                               | `computeBalances` (`duplicate_expense`, `foreign_expense`) |
+
+If any check fails, the page says the balances can't be shown and shows no figures. A wrong balance
+is never shown as if it were right.
+
+### Where it's calculated
+
+- **Postgres** (`public.household_balances`, see [database.md](database.md#balances-roadmap-phase-9))
+  calculates what the app shows, as the signed-in member, under RLS, in one snapshot.
+- **TypeScript** ([balances.ts](../src/domain/money/balances.ts)) is the reference implementation
+  (`computeBalances`, `entriesFor`), plus the invariant checks the app runs on the database's answer.
+- **Totals travel as text** and are parsed with `BigInt` ([parse.ts](../src/lib/balances/parse.ts)),
+  because a household's totals aren't capped like a single expense and JSON numbers are doubles.
+  Anything else is refused.
+- **Words** ([explain.ts](../src/lib/balances/explain.ts)) are built only from those verified
+  figures. Signed amounts in sentences carry an invisible WORD JOINER (U+2060) after the sign, so a
+  line never breaks between "+" and "₹".
+
+### Balance tests
+
+| File                                                                                                       | Covers                                                                                                                                                                                                                            |
+| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [balances.test.ts](../src/domain/money/balances.test.ts)                                                   | Worked examples (the ₹900 three-way split, one participant, leftovers, percentage, custom, several payers, settled households, people who have left), 1,000 generated households, totals beyond 2^53, every error code, lifecycle |
+| [parse.test.ts](../src/lib/balances/parse.test.ts), [explain.test.ts](../src/lib/balances/explain.test.ts) | Exact parsing and refusal of anything else; wording, signs and decimals                                                                                                                                                           |
+| [supabase/tests/balances.test.ts](../supabase/tests/balances.test.ts)                                      | SQL vs. TypeScript on generated expenses with edits, deletes and restores; lifecycle; D24; D13/O8 agreement; currencies; access; the HJ013 guard inside an uncommitted transaction                                                |
+| [e2e/balances.spec.ts](../e2e/balances.spec.ts)                                                            | The pages in a browser, desktop and phone                                                                                                                                                                                         |
