@@ -114,7 +114,7 @@ Last verified: 2026-11-10, after Phase 6.
 **Status**
 
 - **Implemented features:** the UI foundation, the Phase 4 database foundation, Phase 5 authentication and profiles (sign-up with email confirmation, sign-in, sign-out, password recovery, display-name editing), and Phase 6 households (create, list, overview, members, invite links, join, leave, remove, transfer ownership, delete when alone). No emails are sent for invites; links are copied and shared by hand.
-- **Not done:** Phase 3 (application shell). A minimal signed-in header stands in for it.
+- **Phase 3 (application shell)** was built after Phase 6, on 2026-11-10: sidebar from 1024px, top bar and bottom tab bar below. See [design-system.md](design-system.md#application-shell).
 - **Resolved:**
   - `npx` works.
   - The odd output in Phase 0 came from the version-check loop, not from npx.

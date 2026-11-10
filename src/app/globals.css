@@ -251,6 +251,16 @@
   }
 }
 
+/* Toasts sit above the signed-in shell's bottom tab bar (shown below lg). */
+:root {
+  --toast-offset-bottom: 1.5rem;
+}
+@media (width < 64rem) {
+  :root:has([data-bottom-nav]) {
+    --toast-offset-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,

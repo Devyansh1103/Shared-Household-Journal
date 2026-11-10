@@ -30,8 +30,8 @@ export function MemberList({
                 <AvatarFallback>{initials(member.displayName)}</AvatarFallback>
               </Avatar>
               <div className="min-w-0">
-                <p className="flex flex-wrap items-center gap-2">
-                  <span className="truncate type-card-title">
+                <p className="flex min-w-0 items-center gap-2">
+                  <span className="min-w-0 truncate type-card-title">
                     {member.displayName}
                     {isMe ? (
                       <span className="type-secondary"> (you)</span>

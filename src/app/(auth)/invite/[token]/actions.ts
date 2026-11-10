@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { formValue, type FormState } from "@/lib/auth/form-state";
 import { requireUser } from "@/lib/auth/session";
@@ -31,5 +32,7 @@ export async function acceptInvite(
   }
 
   const notice = data.already_member ? "already" : "joined";
+  // The shell's household switcher lives in the shared layout: re-render it.
+  revalidatePath("/", "layout");
   redirect(`/households/${data.joined_household_id}?${notice}=1`);
 }

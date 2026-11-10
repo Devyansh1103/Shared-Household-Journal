@@ -3,10 +3,13 @@ import type { Metadata } from "next";
 import { FormSkeleton } from "@/components/form-skeleton";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
+import { Section } from "@/components/layout/section";
+import { SubmitButton } from "@/components/submit-button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { getMyProfile, requireUser } from "@/lib/auth/session";
 import { initials } from "@/lib/initials";
+import { signOut } from "../actions";
 import { ProfileForm } from "./profile-form";
 
 export const metadata: Metadata = { title: "Your profile" };
@@ -23,6 +26,16 @@ export default function ProfilePage() {
       >
         <ProfileDetails />
       </Suspense>
+      <Section
+        title="Sign out"
+        description="Signs you out on this device only."
+      >
+        <form action={signOut}>
+          <SubmitButton variant="outline" pendingLabel="Signing out…">
+            Sign out
+          </SubmitButton>
+        </form>
+      </Section>
     </PageContainer>
   );
 }

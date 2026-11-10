@@ -79,14 +79,14 @@ async function Households() {
     <Section title="Your households" actions={createButton}>
       <ul className="grid gap-3 sm:grid-cols-2">
         {households.map((household) => (
-          <li key={household.id}>
+          <li key={household.id} className="min-w-0">
             <Link
               href={`/households/${household.id}`}
               className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-card hover:bg-muted"
             >
-              <span className="min-w-0 space-y-1">
-                <span className="flex flex-wrap items-center gap-2">
-                  <span className="truncate type-card-title">
+              <span className="block min-w-0 flex-1 space-y-1">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="min-w-0 truncate type-card-title">
                     {household.name}
                   </span>
                   {household.role === "owner" ? (

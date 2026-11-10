@@ -90,6 +90,24 @@ Typography roles are `type-*` utilities. They are deliberately not named `text-*
 - **Shadows:** `shadow-card` (used on cards) and `shadow-raised`.
 - **Layout primitives:** `PageContainer`, `PageHeader` (title, description, actions that wrap on mobile) and `Section` (an `h2` with optional description and actions).
 
+## Application shell
+
+Built in Phase 3 (after Phase 6). Signed-in pages (`src/app/(app)/layout.tsx`) get:
+
+| Width           | Layout                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| ≥ 1024px (`lg`) | Sticky 256px sidebar: logo, household switcher, main nav, and account (name → Profile, Sign out) at the foot.                  |
+| < 1024px        | Sticky top bar (logo, household switcher) and a fixed bottom tab bar with icon + text labels. Sign out is on the Profile page. |
+
+- **Main nav** ([src/lib/navigation.ts](../src/lib/navigation.ts), unit-tested): Home, Household (only inside one of your households), Profile. Only routes that exist are listed (D23); each feature phase adds its entry with its pages.
+- **Active item:** `aria-current="page"`, a heavier weight and an indicator bar, so it never relies on colour alone.
+- **Household switcher** ([src/components/shell/household-switcher.tsx](../src/components/shell/household-switcher.tsx)): the current household is read from the URL (`/households/[householdId]`) and is shown only if it's one of yours. Switching is plain navigation, so each page loads its own data on the server. Nothing is stored in the browser.
+- **Fresh after changes:** actions that change your list of households (create, join, leave, delete) call `revalidatePath("/", "layout")` before redirecting.
+- **Resilient:** if the household list can't be loaded, the shell falls back to a "Your households" link and the page still renders its own error state.
+- **Skip link** "Skip to main content" is the first Tab stop.
+- **Toasts** are lifted above the bottom tab bar (`--toast-offset-bottom` in `globals.css`).
+- **Hidden previous pages:** Next.js keeps the previous page mounted but hidden after a client navigation. Browser tests must match visible elements only.
+
 ## Components
 
 **shadcn/ui primitives (Radix base)**

@@ -30,6 +30,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--border-radius": "var(--radius)",
         } as React.CSSProperties
       }
+      // Lifted above the bottom tab bar where there is one (globals.css).
+      offset={{ bottom: "var(--toast-offset-bottom)" }}
+      mobileOffset={{ bottom: "var(--toast-offset-bottom)" }}
       toastOptions={{
         classNames: {
           toast: "cn-toast",

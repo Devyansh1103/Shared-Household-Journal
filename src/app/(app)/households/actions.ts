@@ -1,6 +1,6 @@
 "use server";
 
-import { refresh } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { GENERIC_ERROR } from "@/lib/auth/errors";
 import { formValue, type FormState } from "@/lib/auth/form-state";
@@ -73,6 +73,8 @@ export async function createHousehold(
     };
   }
 
+  // The shell's household switcher lives in the shared layout: re-render it.
+  revalidatePath("/", "layout");
   redirect(`/households/${householdId}?created=1`);
 }
 
@@ -166,6 +168,7 @@ export async function leaveHousehold(
     return { status: "error", message: householdErrorMessage(error.code) };
   }
 
+  revalidatePath("/", "layout");
   redirect("/home?left=1");
 }
 
@@ -235,5 +238,6 @@ export async function deleteHousehold(
     return { status: "error", message: householdErrorMessage(error.code) };
   }
 
+  revalidatePath("/", "layout");
   redirect("/home?deleted=1");
 }
