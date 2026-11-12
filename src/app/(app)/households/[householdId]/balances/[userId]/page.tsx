@@ -3,25 +3,36 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeftIcon, ChevronDownIcon } from "lucide-react";
+import { cn } from "cn";
 import { Amount } from "@/components/amount";
 import { BalanceAmount, BalanceBadge } from "@/components/balance";
 import { FormAlert } from "@/components/form-alert";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Section } from "@/components/layout/section";
+import { SettlementNotice } from "@/components/settlement-notice";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { balanceDirection, pairsFor } from "@/domain/money/balances";
+import {
+  balanceDirection,
+  pairsFor,
+  settlementOther,
+} from "@/domain/money/balances";
 import {
   absMinor,
   balanceSentence,
+  combinedTotalSentence,
   entriesTotalSentence,
   formatBalance,
   pairLineSentence,
   pairPhrase,
+  paidBackSentence,
   paidSentence,
+  partTotalSentence,
   personLabel,
   plural,
+  receivedBackSentence,
   shareLabel,
   shareSentence,
   workingSentence,
@@ -29,9 +40,12 @@ import {
 } from "@/lib/balances/explain";
 import { getBalances } from "@/lib/balances/queries";
 import { formatDate } from "@/lib/format";
+import { paymentSentence, paymentTitle } from "@/lib/settlements/wording";
 import { BalancesUnavailable } from "../balances-unavailable";
 
 export const metadata: Metadata = { title: "Balance" };
+
+const ZERO = BigInt(0);
 
 export default function PersonBalancePage({
   params,
@@ -96,7 +110,20 @@ async function PersonBalance({
   const whose = who.you ? "your" : `${focus.displayName}'s`;
   const openWith = typeof query.with === "string" ? query.with : null;
   const pairs = pairsFor(balances.pairs, focus.userId);
-  const { entries } = balances;
+  const { entries, settlementEntries } = balances;
+  const hasPayments = balances.settlementEntryCount > 0;
+  const paidBack = paidBackSentence(who, focus, currency);
+  const receivedBack = receivedBackSentence(who, focus, currency);
+  const expensesNet = focus.paidMinor - focus.shareMinor;
+  const paymentsNet =
+    focus.settlementsPaidMinor - focus.settlementsReceivedMinor;
+  // D9 and O9: you record payments you made or received, with someone who's
+  // still a member.
+  const canRecordWith = (otherId: string) =>
+    who.you &&
+    focus.isActive &&
+    people.get(otherId)?.isActive === true &&
+    otherId !== me;
 
   return (
     <>
@@ -128,13 +155,19 @@ async function PersonBalance({
 
       <Section
         title="How it's worked out"
-        description="Balance = what was paid − the share of the costs. Positive means money back; negative means money owed."
+        description={
+          hasPayments
+            ? "Balance = what was paid − the share of the costs + what was paid back − what was received back. Positive means money back; negative means money owed."
+            : "Balance = what was paid − the share of the costs. Positive means money back; negative means money owed."
+        }
       >
         <Card>
           <CardContent>
             <ul className="space-y-2 type-body">
               <li>{paidSentence(who, focus, currency)}</li>
               <li>{shareSentence(who, focus, currency)}</li>
+              {paidBack ? <li>{paidBack}</li> : null}
+              {receivedBack ? <li>{receivedBack}</li> : null}
               <li>{workingSentence(who, focus, currency)}</li>
             </ul>
           </CardContent>
@@ -143,7 +176,11 @@ async function PersonBalance({
 
       <Section
         title={`Between ${who.you ? "you" : focus.displayName} and others`}
-        description="What each person owes the other cancels out. Open one to see the expenses behind it."
+        description={
+          hasPayments
+            ? "What each person owes the other cancels out, and recorded payments reduce it. Open one to see what's behind it."
+            : "What each person owes the other cancels out. Open one to see the expenses behind it."
+        }
       >
         {pairs.length === 0 ? (
           <p className="type-body">
@@ -160,6 +197,9 @@ async function PersonBalance({
                   .filter((c) => c.userId === otherId)
                   .map((c) => ({ entry, minor: c.minor })),
               );
+              const payments = settlementEntries.filter(
+                (s) => settlementOther(s, focus.userId) === otherId,
+              );
               return (
                 <details
                   key={otherId}
@@ -169,7 +209,7 @@ async function PersonBalance({
                 >
                   <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl p-4 group-open:rounded-b-none hover:bg-muted [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0 flex-1 type-label">
-                      {minor > BigInt(0)
+                      {minor > ZERO
                         ? pairPhrase(other, who)
                         : pairPhrase(who, other)}
                     </span>
@@ -209,12 +249,41 @@ async function PersonBalance({
                         </p>
                       </li>
                     ))}
+                    {payments.map((payment) => (
+                      <PaymentLine
+                        key={payment.settlementId}
+                        href={`${base}/settlements/${payment.settlementId}`}
+                        payer={subject(payment.fromUserId)}
+                        recipient={subject(payment.toUserId)}
+                        amountMinor={payment.amountMinor}
+                        netMinor={payment.netMinor}
+                        settledOn={payment.settledOn}
+                        currency={currency}
+                        compact
+                      />
+                    ))}
                   </ul>
-                  <p className="border-t border-border p-4 type-help">
-                    {complete
-                      ? `${plural(lines.length, "expense")} between them, adding up to ${formatBalance(minor, currency)} from ${whose} side.`
-                      : "Only the newest expenses are listed here. The amount above includes all of them."}
-                  </p>
+                  <div className="space-y-3 border-t border-border p-4">
+                    <p className="type-help">
+                      {!complete
+                        ? hasPayments
+                          ? "Only the newest expenses and payments are listed here. The amount above includes all of them."
+                          : "Only the newest expenses are listed here. The amount above includes all of them."
+                        : payments.length === 0
+                          ? `${plural(lines.length, "expense")} between them, adding up to ${formatBalance(minor, currency)} from ${whose} side.`
+                          : `${plural(lines.length, "expense")} and ${plural(payments.length, "recorded payment")} between them, adding up to ${formatBalance(minor, currency)} from ${whose} side.`}
+                    </p>
+                    {canRecordWith(otherId) ? (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link
+                          href={`${base}/settlements/new?with=${otherId}`}
+                          aria-label={`Record a payment ${minor < ZERO ? "to" : "from"} ${other.name}`}
+                        >
+                          Record a payment
+                        </Link>
+                      </Button>
+                    ) : null}
+                  </div>
                 </details>
               );
             })}
@@ -285,19 +354,97 @@ async function PersonBalance({
               })}
             </ul>
             <p className="type-help">
-              {complete
-                ? entriesTotalSentence(
-                    who,
-                    entries.length,
-                    focus.netMinor,
-                    currency,
-                  )
-                : `Showing the newest ${entries.length} of ${balances.entryCount} expenses. The figures above include all of them.`}
+              {!complete
+                ? `Showing the newest ${entries.length} of ${balances.entryCount} expenses. The figures above include all of them.`
+                : hasPayments
+                  ? partTotalSentence(entries.length, expensesNet, currency)
+                  : entriesTotalSentence(
+                      who,
+                      entries.length,
+                      focus.netMinor,
+                      currency,
+                    )}
             </p>
           </div>
         )}
       </Section>
+
+      {hasPayments ? (
+        <Section
+          title={`Payments behind ${whose} balance`}
+          description={`Every recorded payment ${who.you ? "you" : focus.displayName} made or received, newest first. Voided payments don't count.`}
+        >
+          <div className="space-y-3">
+            <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+              {settlementEntries.map((payment) => (
+                <PaymentLine
+                  key={payment.settlementId}
+                  href={`${base}/settlements/${payment.settlementId}`}
+                  payer={subject(payment.fromUserId)}
+                  recipient={subject(payment.toUserId)}
+                  amountMinor={payment.amountMinor}
+                  netMinor={payment.netMinor}
+                  settledOn={payment.settledOn}
+                  currency={currency}
+                />
+              ))}
+            </ul>
+            <p className="type-help">
+              {complete
+                ? `${partTotalSentence(settlementEntries.length, paymentsNet, currency)} ${combinedTotalSentence(who, focus.netMinor, currency)}`
+                : `Showing the newest ${settlementEntries.length} of ${balances.settlementEntryCount} payments. The figures above include all of them.`}
+            </p>
+            <SettlementNotice />
+          </div>
+        </Section>
+      ) : null}
     </>
+  );
+}
+
+/** One recorded payment and what it does to the focus person's balance. */
+function PaymentLine({
+  href,
+  payer,
+  recipient,
+  amountMinor,
+  netMinor,
+  settledOn,
+  currency,
+  compact = false,
+}: {
+  href: string;
+  payer: Subject;
+  recipient: Subject;
+  amountMinor: bigint;
+  netMinor: bigint;
+  settledOn: string;
+  currency: string;
+  /** Inside a pair: a smaller title. */
+  compact?: boolean;
+}) {
+  return (
+    <li className="space-y-1 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <Link
+          href={href}
+          className={cn(
+            "min-w-0 truncate rounded-sm text-primary underline-offset-4 hover:underline",
+            compact ? "type-label" : "type-card-title",
+          )}
+        >
+          {paymentTitle(payer, recipient)}
+        </Link>
+        <span className="shrink-0">
+          <span className="sr-only">Effect on the balance: </span>
+          <BalanceAmount netMinor={netMinor} currency={currency} />
+        </span>
+      </div>
+      <p className="type-secondary">
+        {formatDate(settledOn)} ·{" "}
+        {paymentSentence(payer, recipient, amountMinor, currency)}
+      </p>
+    </li>
   );
 }
 

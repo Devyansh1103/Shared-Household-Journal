@@ -10,6 +10,12 @@ export type NavItem = {
   label: string;
   /** Also active on sub-paths of `href` (e.g. a household's later pages). */
   matchSubpaths: boolean;
+  /**
+   * Other sections that belong to this item, active with their sub-paths:
+   * settlements are reached from Balances, and the bottom bar has no room
+   * for a sixth tab at 360px.
+   */
+  alsoMatches?: string[];
 };
 
 /** Items in display order. The household item appears only inside a household. */
@@ -37,6 +43,7 @@ export function navItems(currentHouseholdId?: string | null): NavItem[] {
         href: `${base}/balances`,
         label: "Balances",
         matchSubpaths: true,
+        alsoMatches: [`${base}/settlements`],
       },
     );
   }
@@ -53,7 +60,10 @@ export function isActive(item: NavItem, pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   return (
     path === item.href ||
-    (item.matchSubpaths && path.startsWith(`${item.href}/`))
+    (item.matchSubpaths && path.startsWith(`${item.href}/`)) ||
+    (item.alsoMatches ?? []).some(
+      (section) => path === section || path.startsWith(`${section}/`),
+    )
   );
 }
 

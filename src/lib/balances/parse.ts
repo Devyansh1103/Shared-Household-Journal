@@ -8,6 +8,7 @@ import type {
   BalanceEntry,
   PairBalance,
   PersonBalance,
+  SettlementEntry,
 } from "@/domain/money/balances";
 
 const minor = z
@@ -20,6 +21,8 @@ const id = z.uuid();
 const payloadSchema = z.object({
   expense_count: count,
   total_minor: minor,
+  settlement_count: count,
+  settlement_total_minor: minor,
   people: z.array(
     z.object({
       user_id: id,
@@ -27,9 +30,13 @@ const payloadSchema = z.object({
       is_active: z.boolean(),
       paid_minor: minor,
       share_minor: minor,
+      settlements_paid_minor: minor,
+      settlements_received_minor: minor,
       net_minor: minor,
       paid_count: count,
       share_count: count,
+      settlements_paid_count: count,
+      settlements_received_count: count,
     }),
   ),
   pairs: z.array(
@@ -49,11 +56,22 @@ const payloadSchema = z.object({
       counterparts: z.array(z.object({ user_id: id, minor })),
     }),
   ),
+  settlement_entry_count: count,
+  settlement_entries: z.array(
+    z.object({
+      settlement_id: id,
+      settled_on: z.iso.date(),
+      amount_minor: minor,
+      from_user: id,
+      to_user: id,
+      net_minor: minor,
+    }),
+  ),
 });
 
 export type BalancePerson = PersonBalance & {
   displayName: string;
-  /** False for someone who has left but is still in counted expenses (D13). */
+  /** False for someone who has left but is still in counted records (D13). */
   isActive: boolean;
 };
 
@@ -64,15 +82,26 @@ export type BalanceLine = BalanceEntry & {
   paidBy: string;
 };
 
+export type SettlementLine = SettlementEntry & {
+  /** The day the money changed hands. */
+  settledOn: string;
+};
+
 export type BalanceSummary = {
   expenseCount: number;
   totalMinor: bigint;
+  settlementCount: number;
+  settlementTotalMinor: bigint;
   people: BalancePerson[];
   pairs: PairBalance[];
   /** All counted expenses behind the focus person's balance. */
   entryCount: number;
   /** The newest of them (all of them unless the database capped the list). */
   entries: BalanceLine[];
+  /** All counted settlements behind the focus person's balance. */
+  settlementEntryCount: number;
+  /** The newest of them (all of them unless the database capped the list). */
+  settlementEntries: SettlementLine[];
 };
 
 /** The payload as typed values, or null if it isn't exactly what's expected. */
@@ -84,15 +113,21 @@ export function parseBalancesPayload(payload: unknown): BalanceSummary | null {
   return {
     expenseCount: data.expense_count,
     totalMinor: data.total_minor,
+    settlementCount: data.settlement_count,
+    settlementTotalMinor: data.settlement_total_minor,
     people: data.people.map((person) => ({
       userId: person.user_id,
       displayName: person.display_name ?? "Former member",
       isActive: person.is_active,
       paidMinor: person.paid_minor,
       shareMinor: person.share_minor,
+      settlementsPaidMinor: person.settlements_paid_minor,
+      settlementsReceivedMinor: person.settlements_received_minor,
       netMinor: person.net_minor,
       paidCount: person.paid_count,
       shareCount: person.share_count,
+      settlementsPaidCount: person.settlements_paid_count,
+      settlementsReceivedCount: person.settlements_received_count,
     })),
     pairs: data.pairs.map((pair) => ({
       debtorId: pair.debtor_id,
@@ -113,6 +148,15 @@ export function parseBalancesPayload(payload: unknown): BalanceSummary | null {
         userId: c.user_id,
         minor: c.minor,
       })),
+    })),
+    settlementEntryCount: data.settlement_entry_count,
+    settlementEntries: data.settlement_entries.map((entry) => ({
+      settlementId: entry.settlement_id,
+      settledOn: entry.settled_on,
+      amountMinor: entry.amount_minor,
+      fromUserId: entry.from_user,
+      toUserId: entry.to_user,
+      netMinor: entry.net_minor,
     })),
   };
 }

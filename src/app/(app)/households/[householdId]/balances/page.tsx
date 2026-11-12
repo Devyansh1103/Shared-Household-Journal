@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Section } from "@/components/layout/section";
+import { SettlementNotice } from "@/components/settlement-notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,8 +18,10 @@ import {
   balanceSentence,
   formula,
   pairPhrase,
+  paidBackSentence,
   paidSentence,
   personLabel,
+  receivedBackSentence,
   shareSentence,
   type Subject,
 } from "@/lib/balances/explain";
@@ -53,7 +56,7 @@ async function Balances({
   const header = (
     <PageHeader
       title="Balances"
-      description={`Who has paid what for ${household.name}, and who owes whom, worked out from the expenses each time you look. The app keeps the record; it doesn't move money.`}
+      description={`Who has paid what for ${household.name}, and who owes whom, worked out from the expenses and recorded payments each time you look. The app keeps the record; it doesn't move money.`}
     />
   );
 
@@ -71,7 +74,9 @@ async function Balances({
   }
 
   const { balances } = view;
-  if (balances.expenseCount === 0) {
+  // With no expenses but a recorded payment (say, after the expenses were
+  // deleted, D8), there's still a balance to show.
+  if (balances.expenseCount === 0 && balances.settlementCount === 0) {
     return (
       <div className="space-y-8">
         {header}
@@ -104,6 +109,13 @@ async function Balances({
   });
   const sum = (pick: (p: BalancePerson) => bigint) =>
     balances.people.reduce((total, p) => total + pick(p), ZERO);
+  // D9 and O9: you can record a payment you made or received, with someone
+  // who's still a member.
+  const active = new Set(
+    balances.people.filter((p) => p.isActive).map((p) => p.userId),
+  );
+  const paidBack = paidBackSentence(subject(me), mine, currency);
+  const receivedBack = receivedBackSentence(subject(me), mine, currency);
 
   return (
     <div className="space-y-8">
@@ -128,6 +140,8 @@ async function Balances({
           <ul className="space-y-1 type-secondary">
             <li>{paidSentence(subject(me), mine, currency)}</li>
             <li>{shareSentence(subject(me), mine, currency)}</li>
+            {paidBack ? <li>{paidBack}</li> : null}
+            {receivedBack ? <li>{receivedBack}</li> : null}
             <li>{formula(mine, currency)}.</li>
           </ul>
           <Link
@@ -142,7 +156,7 @@ async function Balances({
 
       <Section
         title="Who owes whom"
-        description="Everyone owes the person who paid their share. Between two people, what they owe each other cancels out."
+        description="Everyone owes the person who paid their share, and a recorded payment reduces what the payer owes. Between two people, what they owe each other cancels out."
       >
         {balances.pairs.length === 0 ? (
           <p className="type-body">Nobody owes anyone right now.</p>
@@ -150,6 +164,10 @@ async function Balances({
           <ul className="divide-y divide-border rounded-xl border border-border bg-card">
             {balances.pairs.map((pair) => {
               // Open the pair from the viewer's side when they're in it.
+              const mineToRecord =
+                (pair.debtorId === me || pair.creditorId === me) &&
+                active.has(pair.debtorId) &&
+                active.has(pair.creditorId);
               const [owner, other] =
                 pair.debtorId === me
                   ? [me, pair.creditorId]
@@ -159,11 +177,11 @@ async function Balances({
               return (
                 <li
                   key={`${pair.debtorId}-${pair.creditorId}`}
-                  className="min-w-0"
+                  className="flex min-w-0 flex-wrap items-center"
                 >
                   <Link
                     href={`${base}/balances/${owner}?with=${other}#with-${other}`}
-                    className="flex items-center gap-3 p-4 hover:bg-muted"
+                    className="flex min-w-0 flex-1 basis-64 items-center gap-3 p-4 hover:bg-muted"
                   >
                     <span className="min-w-0 flex-1 type-label">
                       {pairPhrase(
@@ -177,20 +195,42 @@ async function Balances({
                       className="size-5 shrink-0 text-muted-foreground"
                     />
                   </Link>
+                  {mineToRecord ? (
+                    <div className="w-full px-4 pb-4 sm:w-auto sm:py-4 sm:pl-0">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link
+                          href={`${base}/settlements/new?with=${other}`}
+                          aria-label={`Record a payment ${pair.debtorId === me ? "to" : "from"} ${subject(other).name}`}
+                        >
+                          Record a payment
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
           </ul>
         )}
-        <p className="type-help">
-          Recording that someone has paid someone back comes in a later update.
-          The app never moves money.
-        </p>
+        <SettlementNotice>
+          When someone pays someone back outside the app, record it so the
+          balances stay right.{" "}
+          <Link
+            href={`${base}/settlements`}
+            className="rounded-sm text-primary underline underline-offset-4"
+          >
+            Settlements
+          </Link>
+        </SettlementNotice>
       </Section>
 
       <Section
         title="Everyone's balance"
-        description="Balance = what someone paid − their share of the costs. Positive means they should get money back; negative means they owe."
+        description={
+          balances.settlementCount > 0
+            ? "Balance = what someone paid − their share of the costs + what they paid back − what they were paid back. Positive means they should get money back; negative means they owe."
+            : "Balance = what someone paid − their share of the costs. Positive means they should get money back; negative means they owe."
+        }
       >
         <ul className="divide-y divide-border rounded-xl border border-border bg-card">
           {balances.people.map((person) => (
@@ -229,6 +269,26 @@ async function Balances({
                           tone="muted"
                         />
                       </span>
+                      {person.settlementsPaidCount > 0 ? (
+                        <span>
+                          Paid back{" "}
+                          <Amount
+                            minor={person.settlementsPaidMinor}
+                            currency={currency}
+                            tone="muted"
+                          />
+                        </span>
+                      ) : null}
+                      {person.settlementsReceivedCount > 0 ? (
+                        <span>
+                          Received back{" "}
+                          <Amount
+                            minor={person.settlementsReceivedMinor}
+                            currency={currency}
+                            tone="muted"
+                          />
+                        </span>
+                      ) : null}
                     </span>
                     <BalanceBadge
                       direction={balanceDirection(person.netMinor)}
@@ -247,7 +307,11 @@ async function Balances({
 
       <Section
         title="How the numbers add up"
-        description="Every figure here comes from the expenses. Deleted expenses don't count."
+        description={
+          balances.settlementCount > 0
+            ? "Every figure here comes from the expenses and recorded payments. Deleted expenses and voided payments don't count."
+            : "Every figure here comes from the expenses. Deleted expenses don't count."
+        }
       >
         <Card>
           <CardContent className="space-y-4">
@@ -264,6 +328,21 @@ async function Balances({
               <Figure term="Everyone's shares">
                 <Amount minor={sum((p) => p.shareMinor)} currency={currency} />
               </Figure>
+              {balances.settlementCount > 0 ? (
+                <>
+                  <Figure term="Payments recorded">
+                    <span className="type-amount">
+                      {balances.settlementCount}
+                    </span>
+                  </Figure>
+                  <Figure term="Paid back in total">
+                    <Amount
+                      minor={balances.settlementTotalMinor}
+                      currency={currency}
+                    />
+                  </Figure>
+                </>
+              ) : null}
               <Figure term="All balances together">
                 <Amount minor={sum((p) => p.netMinor)} currency={currency} />
               </Figure>
@@ -272,6 +351,9 @@ async function Balances({
               Payments and shares both add up to the total spent, and whatever
               someone is owed, someone else here owes, so the balances always
               add up to zero.
+              {balances.settlementCount > 0
+                ? " Recorded payments only move what's owed between two people, so they don't change the total spent."
+                : ""}
             </p>
           </CardContent>
         </Card>

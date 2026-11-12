@@ -344,6 +344,88 @@ export type Database = {
         };
         Relationships: [];
       };
+      settlements: {
+        Row: {
+          amount_minor: number;
+          created_at: string;
+          creation_key: string | null;
+          from_user: string;
+          household_id: string;
+          id: string;
+          note: string | null;
+          recorded_by: string;
+          settled_on: string;
+          to_user: string;
+          voided_at: string | null;
+          voided_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount_minor: number;
+          created_at?: string;
+          creation_key?: string | null;
+          from_user: string;
+          household_id: string;
+          id?: string;
+          note?: string | null;
+          recorded_by: string;
+          settled_on: string;
+          to_user: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Update: {
+          amount_minor?: number;
+          created_at?: string;
+          creation_key?: string | null;
+          from_user?: string;
+          household_id?: string;
+          id?: string;
+          note?: string | null;
+          recorded_by?: string;
+          settled_on?: string;
+          to_user?: string;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "settlements_from_user_fkey";
+            columns: ["from_user"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "settlements_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "settlements_recorded_by_fkey";
+            columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "settlements_to_user_fkey";
+            columns: ["to_user"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "settlements_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -404,6 +486,19 @@ export type Database = {
         Args: { target_household_id: string };
         Returns: undefined;
       };
+      record_settlement: {
+        Args: {
+          acknowledged_owed?: number;
+          amount: number;
+          memo?: string;
+          paid_on: string;
+          payer_id: string;
+          recipient_id: string;
+          request_key?: string;
+          target_household_id: string;
+        };
+        Returns: string;
+      };
       remove_member: {
         Args: { member_user_id: string; target_household_id: string };
         Returns: undefined;
@@ -430,10 +525,18 @@ export type Database = {
         };
         Returns: undefined;
       };
+      void_settlement: {
+        Args: { target_settlement_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       activity_entity_type:
-        "household" | "household_member" | "invitation" | "expense";
+        | "household"
+        | "household_member"
+        | "invitation"
+        | "expense"
+        | "settlement";
       activity_event_type:
         | "household_created"
         | "member_joined"
@@ -445,7 +548,9 @@ export type Database = {
         | "expense_created"
         | "expense_updated"
         | "expense_deleted"
-        | "expense_restored";
+        | "expense_restored"
+        | "settlement_recorded"
+        | "settlement_voided";
       expense_category:
         | "rent"
         | "utilities"
@@ -589,6 +694,7 @@ export const Constants = {
         "household_member",
         "invitation",
         "expense",
+        "settlement",
       ],
       activity_event_type: [
         "household_created",
@@ -602,6 +708,8 @@ export const Constants = {
         "expense_updated",
         "expense_deleted",
         "expense_restored",
+        "settlement_recorded",
+        "settlement_voided",
       ],
       expense_category: [
         "rent",

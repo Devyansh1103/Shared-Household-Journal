@@ -39,7 +39,8 @@ New migrations: `npx supabase migration new <name>`, then apply locally with
 
 Events written so far: `household_created`, `member_joined`, `member_left`, `member_removed`,
 `ownership_transferred` (from the functions below) and `invitation_created`, `invitation_revoked`
-(from the `invitations_log_activity` trigger). A `before update or delete` trigger rejects every
+(from the `invitations_log_activity` trigger); the `expense_*` events since Phase 8 and
+`settlement_recorded`, `settlement_voided` since roadmap Phase 10. A `before update or delete` trigger rejects every
 change, for every role, except the cascade from deleting the household itself.
 
 ## Functions (Phase 6)
@@ -131,7 +132,7 @@ and are never stored (FR-05, ADR-005). The rules and sign convention are in
 | Function                                                  | Kind                                               | What                                                                                                                                                                                                                                                                                                                        |
 | --------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `household_balances(target_household_id, focus_user_id?)` | `security invoker`, `stable`; `authenticated` only | Raises `42501` unless the caller is an active member; RLS applies as well. Returns JSON: the counted expenses and their total, every person's paid / share / net, the pairs (who owes whom), and, with `focus_user_id`, the counted expenses behind that person's balance (newest 200, plus the full count). Money is text. |
-| `private.balance_people(household_id)`                    | `security invoker`, `stable`                       | The one definition of a balance: per person, paid and shares over non-deleted expenses. Covers active members and anyone else in a counted expense (someone who has left). Sums are `numeric`.                                                                                                                              |
+| `private.balance_people(household_id)`                    | `security invoker`, `stable`                       | Per person, paid and shares over non-deleted expenses. Covers active members and anyone else in a counted expense (someone who has left). Sums are `numeric`. Since roadmap Phase 10 it's the expense half of `private.person_balances`, which adds settlements (below).                                                    |
 | `private.assert_balances_reconcile(household_id)`         | `security invoker`, `stable`                       | Raises `HJ013` (DETAIL = expense id) if a counted expense has no participants or its shares don't add up to its amount.                                                                                                                                                                                                     |
 | `private.member_net_minor(household_id, user_id)`         | Replaced; still `SECURITY DEFINER`                 | Now `assert_balances_reconcile`, then paid − shares from `balance_people`. Used by `leave_household` and `remove_member`.                                                                                                                                                                                                   |
 | `update_expense(…)`                                       | Replaced; same signature and grants                | Also refuses (`HJ007`) an expense whose payer or a participant has left (D24). `delete_expense` is unchanged: deleting such an expense is allowed.                                                                                                                                                                          |
@@ -145,6 +146,51 @@ and are never stored (FR-05, ADR-005). The rules and sign convention are in
 - **No new tables, no stored balances, no data changes.**
 
 New error code: `HJ013` balances can't be calculated (a counted expense doesn't add up).
+
+## Settlements (roadmap Phase 10)
+
+Migration `20261114120000_settlements.sql` (D9, ADR-005, ADR-006, ADR-007). A settlement records
+that one member paid another back **outside the app**. The app never moves money and never checks
+that a payment happened.
+
+| Table         | Purpose                                     | Key constraints                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settlements` | Who paid whom, how much, when, and its fate | `from_user` (paid), `to_user` (received), different people. `amount_minor` 1 – 999,999,999,999, like an expense. `settled_on` is a `date` (D11). `note` null or 1–200 chars, trimmed. `recorded_by` must be `from_user` or `to_user` (D9). `voided_at` and `voided_by` set together, never before `created_at`. `creation_key` makes `record_settlement` idempotent (unique per recorder). Every person column → `profiles` (restrict). |
+
+- **Never edited, never deleted** (D9, ADR-007). The `settlements_protect` trigger refuses every
+  update and delete, for every role including the service role. The only exceptions are voiding,
+  once (`voided_at`/`voided_by` from null to set, nothing else changing), and the cascade from
+  deleting the household itself (D14).
+- **Indexes:** counted settlements by household and date, voided ones by `voided_at`, and each
+  person column.
+- **Currency lock (D1):** `households_lock_currency` now also refuses (`HJ012`) once the household
+  has a settlement, voided ones included, even with no expenses.
+
+Functions (`SECURITY DEFINER`, `search_path = ''`, `EXECUTE` for `authenticated` only). Each takes
+the caller from `auth.uid()` and writes an `activity_events` row (`settlement_recorded` with
+`after`, `settlement_voided` with `before`; entity type `settlement`):
+
+| Function                                                                                                                   | Who                                | What                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `record_settlement(target_household_id, payer_id, recipient_id, amount, paid_on, memo?, request_key?, acknowledged_owed?)` | The payer or the recipient (D9)    | Both people must be different active members (`HJ016`; O9). Settlements in a household are recorded one at a time (`FOR NO KEY UPDATE` on the household row, which doesn't block expense or member inserts). A repeated `request_key` returns the first settlement. If `amount` is more than the payer owes the recipient right now, it refuses with `HJ017` (DETAIL: that figure) unless `acknowledged_owed` equals it. |
+| `void_settlement(target_settlement_id)`                                                                                    | The payer, the recipient, or owner | Locks the row, refuses a second void (`HJ015`), sets `voided_at`/`voided_by`. The row stays readable. Other households' ids get `HJ014`, as if they didn't exist.                                                                                                                                                                                                                                                        |
+
+Balances now include settlements (ADR-005: a settlement from A to B that isn't voided reduces what
+A owes B; net = paid − shares + settlements paid − settlements received):
+
+| Function                                | Kind                         | What                                                                                                                                                                                                                                                      |
+| --------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `private.person_balances(household_id)` | `security invoker`, `stable` | **The one definition of a balance from this phase on.** `balance_people` (expenses) joined with `settlement_people` (settlements paid and received, not voided), and `net_minor`. Covers active members and anyone else in a counted record.              |
+| `private.balance_pairs(household_id)`   | `security invoker`, `stable` | **The one definition of who owes whom.** Expense shares owed to the payer, plus each counted settlement as the recipient owing the payer its amount; the two directions offset within each pair.                                                          |
+| `public.household_balances(…)`          | Replaced; same signature     | Uses both. Adds `settlement_count`, `settlement_total_minor`, each person's `settlements_paid_minor` / `settlements_received_minor` and counts, and, with `focus_user_id`, `settlement_entries` (newest 200) and `settlement_entry_count`. Money is text. |
+| `private.member_net_minor(…)`           | Replaced; same signature     | Now from `person_balances`, so leaving or removal (D13, O8) needs a zero balance including settlements.                                                                                                                                                   |
+
+Error codes: `HJ014` no such settlement, `HJ015` already voided, `HJ016` the payer and the recipient
+must be two different active members, `HJ017` more than what's owed (DETAIL: the current figure,
+signed minor units as text).
+
+No stored balances and no data changes. Expenses and their splits are never touched by a
+settlement (D8).
 
 ## Access control
 
@@ -169,6 +215,7 @@ Helpers live in the `private` schema, which the Data API does not expose. All ar
 | `invitations`       | Active members                                               | Active members; `household_id`, `token_hash`, `expires_at`, `max_uses` only | Set `revoked_at` on an unrevoked invite: its creator, or the owner (D4) | No     |
 | `expenses`          | Active members (deleted ones too, D7)                        | No (`create_expense`)                                                       | No (`update_expense`, `delete_expense`, `restore_expense`)              | No     |
 | `expense_splits`    | Active members                                               | No (functions only)                                                         | No                                                                      | No     |
+| `settlements`       | Active members (voided ones too, D9)                         | No (`record_settlement`)                                                    | No (`void_settlement`; the trigger refuses anything else)               | No     |
 
 "No" means there is no policy **and** no table privilege, so the request fails with `42501`.
 Column-level grants stop an allowed row update from also changing ids, creators or counters.
@@ -180,8 +227,9 @@ Members who leave or are removed lose access immediately, because every check re
 - Invitation caps (O6, still Open): the DB enforces `max_uses > 0` and expiry after creation, but no
   upper bound. The app always uses the defaults (7 days, 10 uses) and offers no other values, but a
   member calling the Data API directly can still insert other values, as since Phase 4.
-- Settlements (Phase 10): add them to `private.balance_people` and to the pairs in
-  `household_balances`; `member_net_minor` follows automatically. How a former member's balance is
-  settled is open (O9).
+- How a former member's balance is settled is still open (O9): new settlements need two active
+  members.
+- D9's in-app notification to the other party arrives with notifications (Phase 17, D12); the
+  `settlement_recorded` event it will use is written now.
 - `expenses.recurring_bill_id` / `recurrence_period` and their unique key arrive with recurring
   bills (Phase 14).

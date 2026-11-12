@@ -4,12 +4,18 @@ import { parseBalancesPayload } from "./parse";
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
 const E = "33333333-3333-4333-8333-333333333333";
+const S = "44444444-4444-4444-8444-444444444444";
 
-/** What household_balances returns for ₹900 paid by A, split between A and B. */
+/**
+ * What household_balances returns for ₹900 paid by A, split between A and B,
+ * after B recorded paying A back ₹150, focused on A.
+ */
 function payload() {
   return {
     expense_count: 1,
     total_minor: "90000",
+    settlement_count: 1,
+    settlement_total_minor: "15000",
     people: [
       {
         user_id: A,
@@ -17,9 +23,13 @@ function payload() {
         is_active: true,
         paid_minor: "90000",
         share_minor: "45000",
-        net_minor: "45000",
+        settlements_paid_minor: "0",
+        settlements_received_minor: "15000",
+        net_minor: "30000",
         paid_count: 1,
         share_count: 1,
+        settlements_paid_count: 0,
+        settlements_received_count: 1,
       },
       {
         user_id: B,
@@ -27,12 +37,27 @@ function payload() {
         is_active: false,
         paid_minor: "0",
         share_minor: "45000",
-        net_minor: "-45000",
+        settlements_paid_minor: "15000",
+        settlements_received_minor: "0",
+        net_minor: "-30000",
         paid_count: 0,
         share_count: 1,
+        settlements_paid_count: 1,
+        settlements_received_count: 0,
       },
     ],
-    pairs: [{ debtor_id: B, creditor_id: A, amount_minor: "45000" }],
+    pairs: [{ debtor_id: B, creditor_id: A, amount_minor: "30000" }],
+    settlement_entry_count: 1,
+    settlement_entries: [
+      {
+        settlement_id: S,
+        settled_on: "2026-11-11",
+        amount_minor: "15000",
+        from_user: B,
+        to_user: A,
+        net_minor: "-15000",
+      },
+    ],
     entry_count: 1,
     entries: [
       {
@@ -56,8 +81,11 @@ describe("parseBalancesPayload", () => {
     expect(parsed).toMatchObject({
       expenseCount: 1,
       totalMinor: BigInt(90000),
-      pairs: [{ debtorId: B, creditorId: A, amountMinor: BigInt(45000) }],
+      settlementCount: 1,
+      settlementTotalMinor: BigInt(15000),
+      pairs: [{ debtorId: B, creditorId: A, amountMinor: BigInt(30000) }],
       entryCount: 1,
+      settlementEntryCount: 1,
     });
     expect(parsed?.people[1]).toEqual({
       userId: B,
@@ -65,10 +93,24 @@ describe("parseBalancesPayload", () => {
       isActive: false,
       paidMinor: BigInt(0),
       shareMinor: BigInt(45000),
-      netMinor: BigInt(-45000),
+      settlementsPaidMinor: BigInt(15000),
+      settlementsReceivedMinor: BigInt(0),
+      netMinor: BigInt(-30000),
       paidCount: 0,
       shareCount: 1,
+      settlementsPaidCount: 1,
+      settlementsReceivedCount: 0,
     });
+    expect(parsed?.settlementEntries).toEqual([
+      {
+        settlementId: S,
+        settledOn: "2026-11-11",
+        amountMinor: BigInt(15000),
+        fromUserId: B,
+        toUserId: A,
+        netMinor: BigInt(-15000),
+      },
+    ]);
     expect(parsed?.entries[0]).toMatchObject({
       expenseId: E,
       expenseDate: "2026-11-10",
@@ -111,5 +153,30 @@ describe("parseBalancesPayload", () => {
 
     expect(parseBalancesPayload(null)).toBeNull();
     expect(parseBalancesPayload("{}")).toBeNull();
+  });
+
+  it("refuses settlement figures that aren't exact or are missing", () => {
+    for (const bad of [15000, "150.00", "1e4", null]) {
+      const tampered = payload() as unknown as {
+        settlement_entries: Record<string, unknown>[];
+      };
+      tampered.settlement_entries[0].amount_minor = bad;
+      expect(parseBalancesPayload(tampered), String(bad)).toBeNull();
+    }
+
+    const badDate = payload();
+    badDate.settlement_entries[0].settled_on = "11/11/2026";
+    expect(parseBalancesPayload(badDate)).toBeNull();
+
+    // A payload from before settlements existed isn't guessed at.
+    const old = payload() as Record<string, unknown>;
+    delete old.settlement_total_minor;
+    expect(parseBalancesPayload(old)).toBeNull();
+
+    const person = payload() as unknown as {
+      people: Record<string, unknown>[];
+    };
+    delete person.people[0].settlements_received_minor;
+    expect(parseBalancesPayload(person)).toBeNull();
   });
 });

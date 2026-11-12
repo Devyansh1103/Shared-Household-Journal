@@ -127,10 +127,11 @@ single units differently, at most one unit per share, and everyone in the househ
 
 ## Balances
 
-Roadmap Phase 9 (ADR-005, D7, D24). Balances are worked out from the records every time they're
-shown, and never stored.
+Roadmap Phase 9 (ADR-005, D7, D24), with settlements since roadmap Phase 10 (D8, D9). Balances
+are worked out from the records every time they're shown, and never stored.
 
-**Sign convention, everywhere:** `net = paid − shares`.
+**Sign convention, everywhere:**
+`net = paid − shares + settlements paid − settlements received`.
 
 | Net      | Meaning                                            | Shown as                                      |
 | -------- | -------------------------------------------------- | --------------------------------------------- |
@@ -145,30 +146,59 @@ shown, and never stored.
   Nothing moves between pairs: that would be debt simplification (Phase 21).
 - **One currency:** a household has one currency, locked once it has an expense (D1). Balances are
   per household, so amounts in different currencies never meet. There's no conversion.
-- **People who have left** stay in the balances while they're in counted expenses, shown as
-  "(left)" (D13). They left at zero (D13, O8), and expenses involving them can't be edited or
-  restored, so their balance changes only if one is deleted (D24). Settling it is open (O9).
-- **Settlements** join in Phase 10: `net = paid − shares + settlements paid − settlements received`.
+- **People who have left** stay in the balances while they're in counted expenses or settlements,
+  shown as "(left)" (D13). They left at zero (D13, O8), and expenses involving them can't be edited
+  or restored, so their balance changes only if one is deleted (D24), or if a settlement with them
+  is voided (D9 allows it). Settling it is open (O9).
+
+### Settlements
+
+A settlement records that one person paid another back outside the app (D9). "Recorded in the
+app — no money is moved."
+
+- **In the balances:** a settlement from A to B that isn't voided adds its amount to A's
+  _settlements paid_ and B's _settlements received_, and reduces what A owes B. In the pairs it's
+  the same as B owing A that amount, so the two directions still offset within each pair.
+  Expenses and their splits are never changed (D8).
+- **Counted** means not voided. A settlement counts once it's recorded (there's no pending state,
+  see O10) and stops counting once voided. It can't be edited or un-voided.
+- **Partial amounts** are fine. **More than what's owed** is allowed, but warned about (D9): it
+  turns the pair round, so the recipient then owes the payer the difference (D8). "What's owed" is
+  the pair amount from the payer to the recipient right now. `record_settlement` refuses with
+  `HJ017` and the current figure until the caller acknowledges exactly that figure, so a warning
+  can't go stale.
+- **Exactly once:** a settlement is one row, counted while `voided_at` is null. A repeated request
+  key returns the first settlement, two people recording the same payment at once are serialized
+  (the second gets the warning), and the reference implementation refuses a settlement listed twice
+  (`duplicate_settlement`).
+- **Same currency:** a settlement is in the household's one currency, which it locks (D1).
+- **Bounds:** 1 to 999,999,999,999 minor units, like an expense, parsed by `parseAmount`.
 
 ### Invariants, and who checks them
 
-| Invariant                                          | Database                                              | App, before anything is shown                              |
-| -------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------- |
-| Each counted expense's shares add up to its amount | Write triggers; `assert_balances_reconcile` (`HJ013`) | `computeBalances` (`not_reconciled`)                       |
-| Each net is paid − shares                          | Computed that way                                     | `checkBalances` (`net_mismatch`)                           |
-| The nets add up to exactly zero                    | Follows from the above                                | `checkBalances` (`not_zero_sum`)                           |
-| Payments and shares each add up to the total spent | Follows from the above                                | `checkBalances` (`totals_mismatch`)                        |
-| Who owes whom adds up to each person's net         | Computed from the same rows                           | `checkBalances` (`pairs_mismatch`, `invalid_pair`)         |
-| The expenses listed behind a balance add up to it  | Same snapshot                                         | `checkEntries` (`entries_mismatch`)                        |
-| No expense counted twice; one household only       | One query per household                               | `computeBalances` (`duplicate_expense`, `foreign_expense`) |
+| Invariant                                                             | Database                                              | App, before anything is shown                      |
+| --------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------- |
+| Each counted expense's shares add up to its amount                    | Write triggers; `assert_balances_reconcile` (`HJ013`) | `computeBalances` (`not_reconciled`)               |
+| Each net is paid − shares + settlements paid − settlements received   | Computed that way (`person_balances`)                 | `checkBalances` (`net_mismatch`)                   |
+| The nets add up to exactly zero                                       | Follows from the above                                | `checkBalances` (`not_zero_sum`)                   |
+| Payments and shares each add up to the total spent                    | Follows from the above                                | `checkBalances` (`totals_mismatch`)                |
+| Settlements paid and received each add up to the settlements recorded | Follows from the above                                | `checkBalances` (`totals_mismatch`)                |
+| Who owes whom adds up to each person's net                            | Computed from the same rows (`balance_pairs`)         | `checkBalances` (`pairs_mismatch`, `invalid_pair`) |
+| The expenses and settlements listed behind a balance add up to it     | Same snapshot                                         | `checkEntries` (`entries_mismatch`)                |
+| No expense or settlement counted twice; one household only            | One row each; one query per household                 | `computeBalances` (`duplicate_*`, `foreign_*`)     |
+| A settlement is between two different people, for more than zero      | Checks, `record_settlement` (`HJ016`, `23514`)        | `computeBalances` (`invalid_settlement`)           |
+| A settlement never changes, apart from being voided once              | `settlements_protect` trigger, for every role         | —                                                  |
 
 If any check fails, the page says the balances can't be shown and shows no figures. A wrong balance
 is never shown as if it were right.
 
 ### Where it's calculated
 
-- **Postgres** (`public.household_balances`, see [database.md](database.md#balances-roadmap-phase-9))
-  calculates what the app shows, as the signed-in member, under RLS, in one snapshot.
+- **Postgres** (`public.household_balances`, see [database.md](database.md#balances-roadmap-phase-9)
+  and [settlements](database.md#settlements-roadmap-phase-10)) calculates what the app shows, as
+  the signed-in member, under RLS, in one snapshot. `private.person_balances` and
+  `private.balance_pairs` are the one definition of a balance and of who owes whom;
+  `record_settlement`'s warning and `member_net_minor` (D13) use the same ones.
 - **TypeScript** ([balances.ts](../src/domain/money/balances.ts)) is the reference implementation
   (`computeBalances`, `entriesFor`), plus the invariant checks the app runs on the database's answer.
 - **Totals travel as text** and are parsed with `BigInt` ([parse.ts](../src/lib/balances/parse.ts)),
@@ -180,9 +210,11 @@ is never shown as if it were right.
 
 ### Balance tests
 
-| File                                                                                                       | Covers                                                                                                                                                                                                                            |
-| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [balances.test.ts](../src/domain/money/balances.test.ts)                                                   | Worked examples (the ₹900 three-way split, one participant, leftovers, percentage, custom, several payers, settled households, people who have left), 1,000 generated households, totals beyond 2^53, every error code, lifecycle |
-| [parse.test.ts](../src/lib/balances/parse.test.ts), [explain.test.ts](../src/lib/balances/explain.test.ts) | Exact parsing and refusal of anything else; wording, signs and decimals                                                                                                                                                           |
-| [supabase/tests/balances.test.ts](../supabase/tests/balances.test.ts)                                      | SQL vs. TypeScript on generated expenses with edits, deletes and restores; lifecycle; D24; D13/O8 agreement; currencies; access; the HJ013 guard inside an uncommitted transaction                                                |
-| [e2e/balances.spec.ts](../e2e/balances.spec.ts)                                                            | The pages in a browser, desktop and phone                                                                                                                                                                                         |
+| File                                                                                                           | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [balances.test.ts](../src/domain/money/balances.test.ts)                                                       | Worked examples (the ₹900 three-way split, one participant, leftovers, percentage, custom, several payers, settled households, people who have left), 1,000 generated households, totals beyond 2^53, every error code, lifecycle. Settlements: the brief's example, partial and several partial payments, several debtors to one creditor and one debtor to several, voided, more than owed, settlements without expenses, deleted expenses after settling (D8), 1,000 generated households with settlements and voids, tampered figures |
+| [parse.test.ts](../src/lib/balances/parse.test.ts), [explain.test.ts](../src/lib/balances/explain.test.ts)     | Exact parsing and refusal of anything else, settlement fields included; wording, signs and decimals                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| [form.test.ts](../src/lib/settlements/form.test.ts), [wording.test.ts](../src/lib/settlements/wording.test.ts) | The settlement form (zero, negative, decimals, yourself, people outside the household, missing fields, dates, notes); D9's wording, what a payment leaves and the warning                                                                                                                                                                                                                                                                                                                                                                 |
+| [supabase/tests/balances.test.ts](../supabase/tests/balances.test.ts)                                          | SQL vs. TypeScript on generated expenses with edits, deletes and restores; lifecycle; D24; D13/O8 agreement; currencies; access; the HJ013 guard inside an uncommitted transaction                                                                                                                                                                                                                                                                                                                                                        |
+| [supabase/tests/settlements.test.ts](../supabase/tests/settlements.test.ts)                                    | Recording and voiding and who may (D9); validation and forged ids; the warning (`HJ017`); retries and concurrent recordings and voids; immutability for every role; the journal; SQL vs. TypeScript with settlements, voids and deletes; D13, O9, D1, D14; access                                                                                                                                                                                                                                                                         |
+| [e2e/balances.spec.ts](../e2e/balances.spec.ts), [e2e/settlements.spec.ts](../e2e/settlements.spec.ts)         | The pages in a browser, desktop and phone: recording from a balance, the review step, the warning, voiding, validation, non-members                                                                                                                                                                                                                                                                                                                                                                                                       |

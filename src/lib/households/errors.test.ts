@@ -14,6 +14,16 @@ describe("householdErrorMessage", () => {
     expect(householdErrorMessage("HJ002")).toMatch(/owner/i);
   });
 
+  it("explains every settlement code in plain words (roadmap Phase 10)", () => {
+    for (const code of ["HJ014", "HJ015", "HJ016", "HJ017"]) {
+      const message = householdErrorMessage(code);
+      expect(message, code).not.toBe(GENERIC_ERROR);
+      expect(message, code).toMatch(/payment|owed/);
+      expect(message, code).not.toMatch(/HJ0|settlements|sqlstate/i);
+    }
+    expect(householdErrorMessage("HJ012")).toMatch(/recorded payments/);
+  });
+
   it("falls back to a generic message for unknown or missing codes", () => {
     expect(householdErrorMessage("XX999")).toBe(GENERIC_ERROR);
     expect(householdErrorMessage(undefined)).toBe(GENERIC_ERROR);

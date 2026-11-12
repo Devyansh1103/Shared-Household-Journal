@@ -43,6 +43,15 @@ describe("isActive", () => {
     ]);
     expect(at(`/households/${HOUSEHOLD}/balances`)).toEqual(["balances"]);
     expect(at(`/households/${HOUSEHOLD}/balances/abc`)).toEqual(["balances"]);
+    // Settlements are part of Balances (roadmap Phase 10).
+    expect(at(`/households/${HOUSEHOLD}/settlements`)).toEqual(["balances"]);
+    expect(at(`/households/${HOUSEHOLD}/settlements/new`)).toEqual([
+      "balances",
+    ]);
+    expect(at(`/households/${HOUSEHOLD}/settlements/abc/`)).toEqual([
+      "balances",
+    ]);
+    expect(at(`/households/${HOUSEHOLD}/settlementsx`)).toEqual([]);
     expect(at(`/households/${HOUSEHOLD}x`)).toEqual([]);
     expect(at("/households/new")).toEqual([]);
   });

@@ -1,7 +1,7 @@
 // Postgres error codes from the household functions mapped to plain messages.
 // Codes HJ001–HJ005 are defined in the Phase 6 migration, HJ006–HJ012 in the
-// expenses migration and HJ013 in the balances migration. Raw database
-// messages are never shown.
+// expenses migration, HJ013 in the balances migration and HJ014–HJ017 in the
+// settlements migration. Raw database messages are never shown.
 
 import { GENERIC_ERROR } from "@/lib/auth/errors";
 
@@ -26,9 +26,16 @@ const MESSAGES: Record<string, string> = {
   HJ010:
     "Someone changed this expense while you were editing. Reload the page to see their changes, then try again.",
   HJ011: "That can't be done to this expense right now. Reload the page.",
-  HJ012: "The currency can't be changed once the household has expenses.",
+  HJ012:
+    "The currency can't be changed once the household has expenses or recorded payments.",
   HJ013:
     "Balances can't be worked out right now because an expense's shares don't add up to its amount. Nothing was changed.",
+  HJ014: "We couldn't find that payment.",
+  HJ015: "That payment is already voided. Reload the page.",
+  HJ016:
+    "A payment is recorded between two different current members of the household. Someone here may have left.",
+  HJ017:
+    "That's more than what's owed right now. Check the figures and try again.",
   "42501": "You don't have permission to do that.",
   "23514": "Some of those details aren't valid. Check them and try again.",
   "22023": "Choose a timezone from the list.",

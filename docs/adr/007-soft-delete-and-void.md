@@ -35,4 +35,12 @@ PRD §11 and TRD §12 leave two questions open: should deletion be hard or soft,
 
 ## Repository evidence
 
-None in code (see [phase-0 audit](../audits/phase-0.md)). Sources: PRD §11, TRD §12.
+Sources: PRD §11, TRD §12.
+
+- **Expenses** (Phase 8): `deleted_at` / `deleted_by`, `delete_expense` and `restore_expense`
+  (owner only); see [database.md](../database.md#expenses-and-splits-phase-8).
+- **Settlements** (roadmap Phase 10, 2026-11-12): `voided_at` / `voided_by` and `void_settlement`
+  (payer, recipient or owner). There's no edit function, and the `settlements_protect` trigger
+  refuses any update other than voiding once, and any delete except the household's own cascade
+  (D14), for every role. See [database.md](../database.md#settlements-roadmap-phase-10).
+- Balance and list queries filter deleted and voided rows themselves; the database tests cover it.

@@ -395,6 +395,11 @@ describe("household_balances", () => {
         netMinor: p.netMinor,
         paidCount: p.paidCount,
         shareCount: p.shareCount,
+        // No settlements here (roadmap Phase 10): all zero on both sides.
+        settlementsPaidMinor: p.settlementsPaidMinor,
+        settlementsReceivedMinor: p.settlementsReceivedMinor,
+        settlementsPaidCount: p.settlementsPaidCount,
+        settlementsReceivedCount: p.settlementsReceivedCount,
       })),
     ).toEqual(reference.people);
     // Same pairs in the same order (largest first, then by ids).

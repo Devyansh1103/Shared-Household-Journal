@@ -2,14 +2,18 @@ import { describe, expect, it } from "vitest";
 import type { PersonBalance } from "@/domain/money/balances";
 import {
   balanceSentence,
+  combinedTotalSentence,
   DIRECTION_LABELS,
+  partTotalSentence,
   entriesTotalSentence,
   formatBalance,
   formula,
   pairLineSentence,
   pairPhrase,
+  paidBackSentence,
   paidSentence,
   personLabel,
+  receivedBackSentence,
   shareLabel,
   shareSentence,
   workingSentence,
@@ -25,14 +29,25 @@ function person(
   paidCount: number,
   share: number,
   shareCount: number,
+  settled: {
+    paidBack?: [number, number];
+    receivedBack?: [number, number];
+  } = {},
 ): PersonBalance {
+  const [settlementsPaid, settlementsPaidCount] = settled.paidBack ?? [0, 0];
+  const [settlementsReceived, settlementsReceivedCount] =
+    settled.receivedBack ?? [0, 0];
   return {
     userId: "p",
     paidMinor: b(paid),
     shareMinor: b(share),
-    netMinor: b(paid - share),
+    settlementsPaidMinor: b(settlementsPaid),
+    settlementsReceivedMinor: b(settlementsReceived),
+    netMinor: b(paid - share + settlementsPaid - settlementsReceived),
     paidCount,
     shareCount,
+    settlementsPaidCount,
+    settlementsReceivedCount,
   };
 }
 
@@ -134,6 +149,71 @@ describe("the working", () => {
     expect(workingSentence(you, none, "INR")).toBe(
       "₹0.00 paid − ₹0.00 share = ₹0.00, so you're settled up.",
     );
+  });
+});
+
+describe("the working with recorded payments (roadmap Phase 10)", () => {
+  // The brief's example after B pays A back ₹300: A paid ₹900, share ₹300,
+  // received ₹300 back; B paid nothing, share ₹300, paid back ₹300.
+  const creditor = person(90000, 1, 30000, 1, { receivedBack: [30000, 1] });
+  const debtor = person(0, 0, 30000, 1, { paidBack: [30000, 1] });
+
+  it("adds what was paid back and received back to the formula", () => {
+    expect(formula(creditor, "INR")).toBe(
+      `₹900.00 paid − ₹300.00 share − ₹300.00 received back = +${WJ}₹300.00`,
+    );
+    expect(workingSentence(you, debtor, "INR")).toBe(
+      "₹0.00 paid − ₹300.00 share + ₹300.00 paid back = ₹0.00, so you're settled up.",
+    );
+    const both = person(0, 0, 0, 0, {
+      paidBack: [10000, 1],
+      receivedBack: [2500, 2],
+    });
+    expect(formula(both, "INR")).toBe(
+      `₹0.00 paid − ₹0.00 share + ₹100.00 paid back − ₹25.00 received back = +${WJ}₹75.00`,
+    );
+  });
+
+  it("adds up the expenses and the payments separately, then together", () => {
+    expect(partTotalSentence(1, b(-30000), "INR")).toBe(
+      `It comes to -${WJ}₹300.00.`,
+    );
+    expect(partTotalSentence(2, b(30000), "INR")).toBe(
+      `Together they come to +${WJ}₹300.00.`,
+    );
+    expect(combinedTotalSentence(you, b(0), "INR")).toBe(
+      "Expenses and recorded payments together come to ₹0.00, your balance.",
+    );
+    expect(combinedTotalSentence(pat, b(-100), "INR")).toBe(
+      `Expenses and recorded payments together come to -${WJ}₹1.00, Pat's balance.`,
+    );
+  });
+
+  it("leaves the formula exactly as before when there are none", () => {
+    expect(formula(person(90000, 1, 30000, 1), "INR")).toBe(
+      `₹900.00 paid − ₹300.00 share = +${WJ}₹600.00`,
+    );
+  });
+
+  it("says who paid back and who was paid back, or nothing", () => {
+    expect(paidBackSentence(you, debtor, "INR")).toBe(
+      "You paid back ₹300.00 in 1 recorded payment.",
+    );
+    expect(paidBackSentence(pat, debtor, "INR")).toBe(
+      "Pat paid back ₹300.00 in 1 recorded payment.",
+    );
+    expect(receivedBackSentence(you, creditor, "INR")).toBe(
+      "You were paid back ₹300.00 in 1 recorded payment.",
+    );
+    expect(
+      receivedBackSentence(
+        pat,
+        person(0, 0, 0, 0, { receivedBack: [500, 2] }),
+        "INR",
+      ),
+    ).toBe("Pat was paid back ₹5.00 in 2 recorded payments.");
+    expect(paidBackSentence(you, creditor, "INR")).toBeNull();
+    expect(receivedBackSentence(you, debtor, "INR")).toBeNull();
   });
 });
 

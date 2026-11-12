@@ -125,12 +125,17 @@ async function HouseholdContent({
 
       <Section
         title="Balances"
-        description="Who has paid what, and who owes whom, worked out from the expenses."
+        description="Who has paid what, and who owes whom, worked out from the expenses and recorded payments."
       >
-        <div>
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link href={`/households/${household.id}/balances`}>
               View balances
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href={`/households/${household.id}/settlements`}>
+              Settlements
             </Link>
           </Button>
         </div>

@@ -111,9 +111,50 @@ export function shareSentence(
   return `${whose} share of the costs is ${formatMoney(person.shareMinor, currency)}, across ${plural(person.shareCount, "expense")}.`;
 }
 
-/** "₹900.00 paid − ₹300.00 share = +₹600.00" */
+/**
+ * "You paid back ₹300.00 in 1 recorded payment.", or null when this person
+ * hasn't paid anyone back (roadmap Phase 10).
+ */
+export function paidBackSentence(
+  subject: Subject,
+  person: PersonBalance,
+  currency: string,
+): string | null {
+  if (person.settlementsPaidCount === 0) return null;
+  const who = subject.you ? "You" : subject.name;
+  return `${who} paid back ${formatMoney(person.settlementsPaidMinor, currency)} in ${plural(person.settlementsPaidCount, "recorded payment")}.`;
+}
+
+/**
+ * "You were paid back ₹300.00 in 1 recorded payment.", or null when nobody
+ * has paid this person back.
+ */
+export function receivedBackSentence(
+  subject: Subject,
+  person: PersonBalance,
+  currency: string,
+): string | null {
+  if (person.settlementsReceivedCount === 0) return null;
+  const who = subject.you ? "You were" : `${subject.name} was`;
+  return `${who} paid back ${formatMoney(person.settlementsReceivedMinor, currency)} in ${plural(person.settlementsReceivedCount, "recorded payment")}.`;
+}
+
+/**
+ * "₹900.00 paid − ₹300.00 share = +₹600.00". Recorded payments add
+ * "+ ₹300.00 paid back" or "− ₹300.00 received back", only when there are any.
+ */
 export function formula(person: PersonBalance, currency: string): string {
-  return `${formatMoney(person.paidMinor, currency)} paid − ${formatMoney(person.shareMinor, currency)} share = ${formatBalance(person.netMinor, currency)}`;
+  const money = (minor: bigint) => formatMoney(minor, currency);
+  const terms = [
+    `${money(person.paidMinor)} paid − ${money(person.shareMinor)} share`,
+  ];
+  if (person.settlementsPaidCount > 0) {
+    terms.push(`+ ${money(person.settlementsPaidMinor)} paid back`);
+  }
+  if (person.settlementsReceivedCount > 0) {
+    terms.push(`− ${money(person.settlementsReceivedMinor)} received back`);
+  }
+  return `${terms.join(" ")} = ${formatBalance(person.netMinor, currency)}`;
 }
 
 /** "₹900.00 paid − ₹300.00 share = +₹600.00, so you should get back ₹600.00." */
@@ -138,6 +179,30 @@ export function entriesTotalSentence(
   const whose = subject.you ? "your" : `${subject.name}'s`;
   const lead = count === 1 ? "It comes to" : "Together they come to";
   return `${lead} ${formatBalance(netMinor, currency)}, ${whose} balance.`;
+}
+
+/**
+ * Under one part of a balance (its expenses, or its recorded payments), when
+ * the other part isn't empty: "It comes to -₹300.00." / "Together they come
+ * to +₹300.00."
+ */
+export function partTotalSentence(
+  count: number,
+  minor: bigint,
+  currency: string,
+): string {
+  const lead = count === 1 ? "It comes to" : "Together they come to";
+  return `${lead} ${formatBalance(minor, currency)}.`;
+}
+
+/** "Expenses and recorded payments together come to ₹0.00, your balance." */
+export function combinedTotalSentence(
+  subject: Subject,
+  netMinor: bigint,
+  currency: string,
+): string {
+  const whose = subject.you ? "your" : `${subject.name}'s`;
+  return `Expenses and recorded payments together come to ${formatBalance(netMinor, currency)}, ${whose} balance.`;
 }
 
 /** "Pat owes Olive", "You owe Olive" or "Pat owes you". */

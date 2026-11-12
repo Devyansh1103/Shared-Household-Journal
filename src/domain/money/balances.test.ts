@@ -6,9 +6,13 @@ import {
   checkEntries,
   computeBalances,
   entriesFor,
+  owedMinor,
   pairsFor,
+  settlementEntriesFor,
+  settlementOther,
   type BalanceExpense,
   type Balances,
+  type BalanceSettlement,
 } from "./balances";
 import { computeSplit, type SplitInput } from "./split";
 
@@ -59,6 +63,13 @@ const nets = (balances: Balances) =>
   Object.fromEntries(
     balances.people.map((p) => [p.userId, Number(p.netMinor)]),
   );
+/** A person's settlement figures when they haven't paid or received any. */
+const noSettlements = {
+  settlementsPaidMinor: BigInt(0),
+  settlementsReceivedMinor: BigInt(0),
+  settlementsPaidCount: 0,
+  settlementsReceivedCount: 0,
+};
 const pairList = (balances: Balances) =>
   balances.pairs.map(
     (p) => `${p.debtorId} owes ${p.creditorId} ${p.amountMinor}`,
@@ -77,6 +88,7 @@ describe("computeBalances: worked examples", () => {
         netMinor: b(60000),
         paidCount: 1,
         shareCount: 1,
+        ...noSettlements,
       },
       {
         userId: "b",
@@ -85,6 +97,7 @@ describe("computeBalances: worked examples", () => {
         netMinor: b(-30000),
         paidCount: 0,
         shareCount: 1,
+        ...noSettlements,
       },
       {
         userId: "c",
@@ -93,6 +106,7 @@ describe("computeBalances: worked examples", () => {
         netMinor: b(-30000),
         paidCount: 0,
         shareCount: 1,
+        ...noSettlements,
       },
     ]);
     expect(pairList(result)).toEqual(["b owes a 30000", "c owes a 30000"]);
@@ -187,6 +201,7 @@ describe("computeBalances: worked examples", () => {
       netMinor: b(0),
       paidCount: 0,
       shareCount: 0,
+      ...noSettlements,
     });
   });
 
@@ -724,5 +739,513 @@ describe("balanceDirection: the sign convention", () => {
     expect(balanceDirection(b(1))).toBe("owed");
     expect(balanceDirection(b(-1))).toBe("owes");
     expect(balanceDirection(b(0))).toBe("settled");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Settlements (roadmap Phase 10, D9, ADR-005)
+// ---------------------------------------------------------------------------
+
+let settlementSequence = 0;
+/** A settlement of household H: `from` paid `to` the amount, outside the app. */
+function settlement(
+  from: string,
+  to: string,
+  amount: number | bigint,
+  extra: Partial<BalanceSettlement> = {},
+): BalanceSettlement {
+  settlementSequence += 1;
+  return {
+    id: `s${settlementSequence}`,
+    householdId: H,
+    fromUserId: from,
+    toUserId: to,
+    amountMinor: BigInt(amount),
+    voided: false,
+    ...extra,
+  };
+}
+
+function settledOf(
+  expenses: BalanceExpense[],
+  settlements: BalanceSettlement[],
+  memberIds = ["a", "b", "c"],
+) {
+  const result = computeBalances({
+    householdId: H,
+    memberIds,
+    expenses,
+    settlements,
+  });
+  if (!result.ok) throw new Error(`${result.code}: ${result.error}`);
+  expect(checkBalances(result)).toEqual({ ok: true });
+  expect(result.people.reduce((s, p) => s + p.netMinor, b(0))).toBe(b(0));
+  return result;
+}
+
+describe("settlements: worked examples", () => {
+  // The brief's example: ₹900 paid by A, split three ways.
+  const rent = expense("a", 90000, { a: 30000, b: 30000, c: 30000 });
+
+  it("matches the brief: B pays A back ₹300, a full settlement", () => {
+    const before = settledOf([rent], []);
+    expect(nets(before)).toEqual({ a: 60000, b: -30000, c: -30000 });
+
+    const after = settledOf([rent], [settlement("b", "a", 30000)]);
+    expect(nets(after)).toEqual({ a: 30000, b: 0, c: -30000 });
+    expect(pairList(after)).toEqual(["c owes a 30000"]);
+    expect(after.people[1]).toMatchObject({
+      userId: "b",
+      paidMinor: b(0),
+      shareMinor: b(30000),
+      settlementsPaidMinor: b(30000),
+      settlementsReceivedMinor: b(0),
+      settlementsPaidCount: 1,
+      netMinor: b(0),
+    });
+    expect(after.people[0]).toMatchObject({
+      settlementsReceivedMinor: b(30000),
+      settlementsReceivedCount: 1,
+    });
+    // Expenses are untouched: the total spent and everyone's shares stay.
+    expect(after.totalMinor).toBe(before.totalMinor);
+    expect(after.expenseCount).toBe(1);
+    expect(after.people.map((p) => p.shareMinor)).toEqual(
+      before.people.map((p) => p.shareMinor),
+    );
+    expect(after).toMatchObject({
+      settlementCount: 1,
+      settlementTotalMinor: b(30000),
+    });
+  });
+
+  it("a partial settlement reduces the debt by exactly its amount", () => {
+    const result = settledOf([rent], [settlement("b", "a", 12345)]);
+    expect(nets(result)).toEqual({ a: 47655, b: -17655, c: -30000 });
+    expect(owedMinor(result.pairs, "b", "a")).toBe(b(17655));
+  });
+
+  it("several partial settlements add up", () => {
+    const result = settledOf(
+      [rent],
+      [
+        settlement("b", "a", 10000),
+        settlement("b", "a", 15000),
+        settlement("b", "a", 4999),
+      ],
+    );
+    expect(nets(result)).toEqual({ a: 30001, b: -1, c: -30000 });
+    expect(result.people[1].settlementsPaidCount).toBe(3);
+    expect(owedMinor(result.pairs, "b", "a")).toBe(b(1));
+  });
+
+  it("several debtors settle with one creditor", () => {
+    const result = settledOf(
+      [rent],
+      [settlement("b", "a", 30000), settlement("c", "a", 30000)],
+    );
+    expect(nets(result)).toEqual({ a: 0, b: 0, c: 0 });
+    expect(result.pairs).toEqual([]);
+    expect(result.people[0].settlementsReceivedCount).toBe(2);
+  });
+
+  it("one debtor settles with several creditors", () => {
+    // B owes A ₹300 (A paid ₹600 for A and B) and C ₹200 (C paid ₹400 for B and C).
+    const expenses = [
+      expense("a", 60000, { a: 30000, b: 30000 }),
+      expense("c", 40000, { b: 20000, c: 20000 }),
+    ];
+    const before = settledOf(expenses, []);
+    expect(pairList(before)).toEqual(["b owes a 30000", "b owes c 20000"]);
+    const after = settledOf(expenses, [
+      settlement("b", "a", 30000),
+      settlement("b", "c", 20000),
+    ]);
+    expect(nets(after)).toEqual({ a: 0, b: 0, c: 0 });
+    expect(after.pairs).toEqual([]);
+  });
+
+  it("counts a recorded settlement straight away: there is no pending state (D9)", () => {
+    // D9 has no confirmation step; a settlement counts once recorded and
+    // stops counting once voided.
+    const recorded = settledOf([rent], [settlement("b", "a", 30000)]);
+    expect(nets(recorded).b).toBe(0);
+  });
+
+  it("a voided settlement doesn't count, and is the same as none (D9)", () => {
+    const voided = settledOf(
+      [rent],
+      [settlement("b", "a", 30000, { voided: true })],
+    );
+    expect(voided).toEqual(settledOf([rent], []));
+    expect(voided).toMatchObject({
+      settlementCount: 0,
+      settlementTotalMinor: b(0),
+    });
+    // Voiding one of two leaves exactly the other.
+    const one = settledOf(
+      [rent],
+      [
+        settlement("b", "a", 10000, { voided: true }),
+        settlement("b", "a", 5000),
+      ],
+    );
+    expect(nets(one)).toEqual({ a: 55000, b: -25000, c: -30000 });
+  });
+
+  it("paying more than is owed turns it round (D8, D9 warns about it)", () => {
+    const result = settledOf([rent], [settlement("b", "a", 50000)]);
+    expect(nets(result)).toEqual({ a: 10000, b: 20000, c: -30000 });
+    expect(pairList(result)).toEqual(["c owes a 30000", "a owes b 20000"]);
+    expect(owedMinor(result.pairs, "b", "a")).toBe(b(-20000));
+  });
+
+  it("works with settlements and no expenses", () => {
+    const result = settledOf([], [settlement("a", "b", 1000)], ["a", "b"]);
+    expect(result).toMatchObject({
+      expenseCount: 0,
+      totalMinor: b(0),
+      settlementCount: 1,
+      settlementTotalMinor: b(1000),
+    });
+    expect(nets(result)).toEqual({ a: 1000, b: -1000 });
+    expect(pairList(result)).toEqual(["b owes a 1000"]);
+  });
+
+  it("an expense deleted after a settlement leaves money owed back (D8)", () => {
+    const settled = [settlement("b", "a", 30000)];
+    const result = settledOf([{ ...rent, deleted: true }], settled);
+    expect(nets(result)).toEqual({ a: -30000, b: 30000, c: 0 });
+    expect(pairList(result)).toEqual(["a owes b 30000"]);
+  });
+
+  it("someone who has left still counts while they're in a counted settlement", () => {
+    const result = settledOf([], [settlement("left1", "a", 700)], ["a", "b"]);
+    expect(result.people.map((p) => p.userId)).toEqual(["a", "b", "left1"]);
+    expect(nets(result)).toEqual({ a: -700, b: 0, left1: 700 });
+  });
+
+  it("never changes the records it's given", () => {
+    const expenses = [expense("a", 900, { a: 300, b: 300, c: 300 })];
+    const settlements = [settlement("b", "a", 300)];
+    const copy = structuredClone({ expenses, settlements });
+    settledOf(expenses, settlements);
+    expect({ expenses, settlements }).toEqual(copy);
+  });
+});
+
+describe("settlements: input checks", () => {
+  const rent = expense("a", 900, { a: 300, b: 300, c: 300 });
+  const attempt = (settlements: BalanceSettlement[]) =>
+    computeBalances({
+      householdId: H,
+      memberIds: ["a", "b", "c"],
+      expenses: [rent],
+      settlements,
+    });
+
+  it("refuses a settlement included twice, so nothing is counted twice", () => {
+    const once = settlement("b", "a", 300);
+    expect(attempt([once, once])).toMatchObject({
+      ok: false,
+      code: "duplicate_settlement",
+      settlementId: once.id,
+    });
+  });
+
+  it("never combines households, and so never currencies (D1)", () => {
+    const foreign = settlement("b", "a", 300, { householdId: "household-x" });
+    expect(attempt([foreign])).toMatchObject({
+      ok: false,
+      code: "foreign_settlement",
+      settlementId: foreign.id,
+    });
+  });
+
+  it("refuses settlements that aren't valid", () => {
+    const cases: BalanceSettlement[] = [
+      settlement("b", "a", 0),
+      settlement("b", "a", -300),
+      settlement("b", "b", 300),
+      settlement("", "a", 300),
+      settlement("b", " ", 300),
+      { ...settlement("b", "a", 300), amountMinor: 300 as unknown as bigint },
+    ];
+    for (const broken of cases) {
+      expect(
+        attempt([broken]),
+        JSON.stringify(broken, (_, v) => String(v)),
+      ).toMatchObject({
+        ok: false,
+        code: "invalid_settlement",
+        settlementId: broken.id,
+      });
+    }
+  });
+
+  it("doesn't check voided settlements, as they don't count", () => {
+    expect(attempt([settlement("b", "b", 0, { voided: true })]).ok).toBe(true);
+  });
+});
+
+describe("checkBalances catches settlement figures that don't add up", () => {
+  const valid = () =>
+    settledOf(
+      [expense("a", 900, { a: 300, b: 300, c: 300 })],
+      [settlement("b", "a", 200), settlement("c", "b", 50)],
+    );
+  const code = (balances: Balances) => {
+    const check = checkBalances(balances);
+    return check.ok ? "ok" : check.code;
+  };
+
+  it("refuses a balance that leaves out what was paid back", () => {
+    const tampered = valid();
+    tampered.people[1].settlementsPaidMinor += b(1);
+    expect(code(tampered)).toBe("net_mismatch");
+
+    const negative = valid();
+    negative.people[2].settlementsReceivedMinor = b(-1);
+    negative.people[2].netMinor += b(1);
+    expect(code(negative)).toBe("net_mismatch");
+  });
+
+  it("refuses settlement totals that don't match what people paid and received", () => {
+    const total = valid();
+    total.settlementTotalMinor += b(1);
+    expect(code(total)).toBe("totals_mismatch");
+
+    const counted = valid();
+    counted.settlementCount = 0;
+    expect(code(counted)).toBe("totals_mismatch");
+
+    // Paid back more by one person and received more by another: each
+    // balance still matches its own figures and they still add up to zero,
+    // but neither side adds up to the settlements recorded.
+    const both = valid();
+    both.people[1].settlementsPaidMinor += b(5);
+    both.people[1].netMinor += b(5);
+    both.people[2].settlementsReceivedMinor += b(5);
+    both.people[2].netMinor -= b(5);
+    expect(code(both)).toBe("totals_mismatch");
+  });
+
+  it("refuses pairs that leave a settlement out", () => {
+    const tampered = valid();
+    tampered.pairs = settledOf(
+      [expense("a", 900, { a: 300, b: 300, c: 300 })],
+      [],
+    ).pairs;
+    expect(code(tampered)).toBe("pairs_mismatch");
+  });
+});
+
+describe("settlementEntriesFor and checkEntries: the settlements behind a balance", () => {
+  const records = [
+    expense("a", 900, { a: 300, b: 300, c: 300 }),
+    expense("b", 300, { a: 150, b: 150 }),
+  ];
+  const payments = [
+    settlement("b", "a", 100),
+    settlement("c", "a", 300),
+    settlement("a", "b", 50, { voided: true }),
+  ];
+  const input = {
+    householdId: H,
+    memberIds: ["a", "b", "c"],
+    expenses: records,
+    settlements: payments,
+  };
+  const balances = settledOf(records, payments);
+  const person = (id: string) => balances.people.find((p) => p.userId === id)!;
+  const expensesOf = (id: string) => {
+    const result = entriesFor(input, id);
+    if (!Array.isArray(result)) throw new Error(result.error);
+    return result;
+  };
+  const settlementsOf = (id: string) => {
+    const result = settlementEntriesFor(input, id);
+    if (!Array.isArray(result)) throw new Error(result.error);
+    return result;
+  };
+  const check = (
+    id: string,
+    settlements = settlementsOf(id),
+    complete = true,
+  ) => {
+    const result = checkEntries(person(id), balances.pairs, expensesOf(id), {
+      complete,
+      settlements,
+    });
+    return result.ok ? "ok" : result.code;
+  };
+
+  it("lists each counted settlement someone paid or received", () => {
+    expect(settlementsOf("a")).toEqual([
+      {
+        settlementId: payments[0].id,
+        fromUserId: "b",
+        toUserId: "a",
+        amountMinor: b(100),
+        netMinor: b(-100),
+      },
+      {
+        settlementId: payments[1].id,
+        fromUserId: "c",
+        toUserId: "a",
+        amountMinor: b(300),
+        netMinor: b(-300),
+      },
+    ]);
+    expect(settlementsOf("b").map((s) => s.netMinor)).toEqual([b(100)]);
+    expect(settlementOther(settlementsOf("b")[0], "b")).toBe("a");
+  });
+
+  it("add up, with the expenses, to each balance and each pair", () => {
+    for (const id of ["a", "b", "c"]) expect(check(id)).toBe("ok");
+    // c paid a back in full: they're even now.
+    expect(owedMinor(balances.pairs, "c", "a")).toBe(b(0));
+    expect(pairsFor(balances.pairs, "a")).toEqual([
+      { otherId: "b", minor: b(50) },
+    ]);
+  });
+
+  it("catch a settlement that's missing, doubled, or doesn't add up", () => {
+    const missing = settlementsOf("a").slice(0, 1);
+    expect(check("a", missing)).toBe("entries_mismatch");
+    expect(check("a", missing, false)).toBe("ok");
+    expect(check("a", [])).toBe("entries_mismatch");
+
+    const twice = settlementsOf("a");
+    twice.push(twice[0]);
+    expect(check("a", twice)).toBe("entries_mismatch");
+
+    const wrongSign = settlementsOf("a");
+    wrongSign[0].netMinor = -wrongSign[0].netMinor;
+    expect(check("a", wrongSign)).toBe("entries_mismatch");
+
+    const wrongAmount = settlementsOf("a");
+    wrongAmount[0].amountMinor += b(1);
+    expect(check("a", wrongAmount)).toBe("entries_mismatch");
+
+    const notTheirs = settlementsOf("a");
+    notTheirs[0] = { ...notTheirs[0], fromUserId: "b", toUserId: "c" };
+    expect(check("a", notTheirs)).toBe("entries_mismatch");
+
+    const moved = settlementsOf("a");
+    moved[0] = { ...moved[0], fromUserId: "c" };
+    expect(check("a", moved)).toBe("entries_mismatch");
+  });
+});
+
+describe("settlement invariants on generated households", () => {
+  /** Same seeded generator as above (mulberry32). */
+  function seeded(seed: number) {
+    let state = seed >>> 0;
+    return () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  it("hold for 1,000 households with expenses, settlements and voids", () => {
+    const rng = seeded(20261112);
+    for (let c = 0; c < 1000; c++) {
+      const members = Array.from(
+        { length: 2 + Math.floor(rng() * 5) },
+        (_, i) => `m${i}`,
+      );
+      const everyone = rng() < 0.3 ? [...members, "left1"] : members;
+      const pick = () => everyone[Math.floor(rng() * everyone.length)];
+      const expenses = Array.from(
+        { length: Math.floor(rng() * 20) },
+        (_, i) => {
+          let chosen = everyone.filter(() => rng() < 0.6);
+          if (chosen.length === 0) chosen = [pick()];
+          return {
+            ...engineExpense(pick(), {
+              method: "equal",
+              total: BigInt(1 + Math.floor(rng() * 5_000_000)),
+              participants: chosen,
+            }),
+            id: `c${c}e${i}`,
+            deleted: rng() < 0.1,
+          };
+        },
+      );
+      const settlements = Array.from(
+        { length: Math.floor(rng() * 15) },
+        (_, i) => {
+          const from = pick();
+          let to = pick();
+          while (to === from)
+            to = everyone[Math.floor(rng() * everyone.length)];
+          return settlement(from, to, 1 + Math.floor(rng() * 3_000_000), {
+            id: `c${c}s${i}`,
+            voided: rng() < 0.2,
+          });
+        },
+      );
+      const input = {
+        householdId: H,
+        memberIds: members,
+        expenses,
+        settlements,
+      };
+      const result = computeBalances(input);
+      expect(result.ok, `case ${c}`).toBe(true);
+      if (!result.ok) return;
+      expect(checkBalances(result), `case ${c}`).toEqual({ ok: true });
+
+      // Independent tallies, straight from the records.
+      const counted = settlements.filter((s) => !s.voided);
+      expect(result.settlementCount).toBe(counted.length);
+      expect(result.settlementTotalMinor).toBe(
+        counted.reduce((s, x) => s + x.amountMinor, b(0)),
+      );
+      for (const p of result.people) {
+        const sent = counted
+          .filter((s) => s.fromUserId === p.userId)
+          .reduce((s, x) => s + x.amountMinor, b(0));
+        const received = counted
+          .filter((s) => s.toUserId === p.userId)
+          .reduce((s, x) => s + x.amountMinor, b(0));
+        expect(p.settlementsPaidMinor).toBe(sent);
+        expect(p.settlementsReceivedMinor).toBe(received);
+        expect(p.netMinor).toBe(p.paidMinor - p.shareMinor + sent - received);
+
+        const entries = entriesFor(input, p.userId);
+        const paidBack = settlementEntriesFor(input, p.userId);
+        if (!Array.isArray(entries) || !Array.isArray(paidBack)) {
+          throw new Error(`case ${c}: entries failed`);
+        }
+        expect(
+          checkEntries(p, result.pairs, entries, {
+            complete: true,
+            settlements: paidBack,
+          }),
+          `case ${c} ${p.userId}`,
+        ).toEqual({ ok: true });
+      }
+      expect(result.people.reduce((s, p) => s + p.netMinor, b(0))).toBe(b(0));
+
+      // Voiding every settlement gives exactly the expense-only balances.
+      const none = computeBalances({
+        ...input,
+        settlements: settlements.map((s) => ({ ...s, voided: true })),
+      });
+      const expensesOnly = computeBalances({ ...input, settlements: [] });
+      expect(none).toEqual(expensesOnly);
+
+      // The same records in another order give the same balances.
+      const again = computeBalances({
+        ...input,
+        settlements: [...settlements].sort(() => rng() - 0.5),
+      });
+      expect(again).toEqual(result);
+    }
   });
 });

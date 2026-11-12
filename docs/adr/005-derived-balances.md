@@ -62,4 +62,16 @@ Implemented 2026-11-10 (roadmap Phase 9). Sources: PRD FR-05, TRD §3 and §5.
   balance can change only if such an expense is deleted. Settling it is open (O9).
 - **Not stored:** nothing is cached, so there's nothing to reconcile.
 
+Settlements joined on 2026-11-12 (roadmap Phase 10), in
+[20261114120000_settlements.sql](../../supabase/migrations/20261114120000_settlements.sql):
+
+- **SQL:** `private.person_balances` (paid − shares + settlements paid − settlements received) and
+  `private.balance_pairs` (a settlement from A to B that isn't voided counts as B owing A, so it
+  reduces what A owes B) are now the one definition of a balance and of who owes whom.
+  `household_balances` and `member_net_minor` use them, with the same signatures.
+- **Reference:** `computeBalances` takes settlements, and `settlementEntriesFor` lists the
+  settlements behind a balance. The database tests cross-check them with settlements, voids and
+  deletes; `checkBalances` and `checkEntries` verify settlement totals and lines before display.
+- **Not linked to expenses:** a settlement never touches an expense or its splits.
+
 See [money.md](../money.md#balances) and [database.md](../database.md#balances-roadmap-phase-9).

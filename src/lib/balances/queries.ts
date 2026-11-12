@@ -25,7 +25,7 @@ export type BalancesView =
       balances: BalanceSummary;
       /** The person asked about, when there is one. */
       focus: BalancePerson | null;
-      /** Every expense behind the focus person's balance is listed. */
+      /** Every expense and settlement behind the focus person's balance is listed. */
       complete: boolean;
     }
   | {
@@ -37,9 +37,10 @@ export type BalancesView =
     };
 
 /**
- * A household's balances. With `focusUserId`, also the expenses behind that
- * person's balance; a 404 if they aren't part of this household's balances.
- * Non-members get the household's 404 (getHousehold).
+ * A household's balances, settlements included. With `focusUserId`, also the
+ * expenses and settlements behind that person's balance; a 404 if they aren't
+ * part of this household's balances. Non-members get the household's 404
+ * (getHousehold).
  */
 export async function getBalances(
   householdId: string,
@@ -84,9 +85,12 @@ export async function getBalances(
   }
   const focus = balances.people.find((p) => p.userId === focusUserId);
   if (!focus) notFound();
-  const complete = balances.entries.length === balances.entryCount;
+  const complete =
+    balances.entries.length === balances.entryCount &&
+    balances.settlementEntries.length === balances.settlementEntryCount;
   const entries = checkEntries(focus, balances.pairs, balances.entries, {
     complete,
+    settlements: balances.settlementEntries,
   });
   if (!entries.ok) return unverified(entries.code);
 

@@ -52,7 +52,10 @@ membership and role, checks the money invariants, writes the change and its `act
 and has `EXECUTE` granted to `authenticated` only. As defence in depth, a deferred constraint
 trigger re-checks that shares add up at commit, whatever the write path (even the service role).
 
-Settlement functions (Phase 10) follow the same pattern.
+Settlement functions (Phase 10) follow the same pattern. Implemented 2026-11-12:
+`record_settlement` and `void_settlement` are `SECURITY DEFINER`, signed-in users have no write
+privileges on `settlements`, and a trigger refuses any change other than voiding, whatever the
+write path.
 
 ## Consequences
 

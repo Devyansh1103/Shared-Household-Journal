@@ -100,7 +100,7 @@ Built in Phase 3 (after Phase 6). Signed-in pages (`src/app/(app)/layout.tsx`) g
 | ≥ 1024px (`lg`) | Sticky 256px sidebar: logo, household switcher, main nav, and account (name → Profile, Sign out) at the foot.                  |
 | < 1024px        | Sticky top bar (logo, household switcher) and a fixed bottom tab bar with icon + text labels. Sign out is on the Profile page. |
 
-- **Main nav** ([src/lib/navigation.ts](../src/lib/navigation.ts), unit-tested): Home; then Household, Expenses and Balances (only inside one of your households); then Profile. Only routes that exist are listed (D23); each feature phase adds its entry with its pages. The bottom bar fits five labelled tabs at 360px (checked in `e2e/balances.spec.ts`).
+- **Main nav** ([src/lib/navigation.ts](../src/lib/navigation.ts), unit-tested): Home; then Household, Expenses and Balances (only inside one of your households); then Profile. Only routes that exist are listed (D23); each feature phase adds its entry with its pages. The bottom bar fits five labelled tabs at 360px (checked in `e2e/balances.spec.ts`), so settlements (roadmap Phase 10) have no tab of their own: Balances stays active on `/settlements` pages (`alsoMatches`).
 - **Active item:** `aria-current="page"`, a heavier weight and an indicator bar, so it never relies on colour alone.
 - **Household switcher** ([src/components/shell/household-switcher.tsx](../src/components/shell/household-switcher.tsx)): the current household is read from the URL (`/households/[householdId]`) and is shown only if it's one of yours. Switching is plain navigation, so each page loads its own data on the server. Nothing is stored in the browser.
 - **Fresh after changes:** actions that change your list of households (create, join, leave, delete) call `revalidatePath("/", "layout")` before redirecting.
@@ -136,6 +136,10 @@ Built in Phase 3 (after Phase 6). Signed-in pages (`src/app/(app)/layout.tsx`) g
 - `BalanceBadge` and `BalanceAmount` ([src/components/balance.tsx](../src/components/balance.tsx)): a balance's direction as an icon and a word ("Owed", "Owes", "Settled up"), and the signed amount toned to match. The direction is always in words too, and the sign is always shown, so colour is never the only signal.
 - `EmptyState`: icon, title, description and a "next step" action.
 - `ErrorState`: an alert that explains what happened and what to do next, with an optional recovery action.
+- `SettlementNotice` ([src/components/settlement-notice.tsx](../src/components/settlement-notice.tsx)): D9's "Recorded in the app — no money is moved." with an icon, and optional context after it. Every settlement surface shows it: the history, the form and its review step, a payment's page, and the settlement parts of the balances pages.
+- `FormAlert` tones: `error`, `success`, `info` and `warning` (roadmap Phase 10, for D9's "more than what's owed"). The `warning` tone uses the `Alert` `warning` variant: `warning` text on `warning-subtle`, a pair `tokens.test.ts` already checks, with a triangle icon so it never relies on colour.
+
+**Settlement wording** ([src/lib/settlements/wording.ts](../src/lib/settlements/wording.ts), unit-tested): "Record a payment", "Payment from Pat to Olive", D9's "Pat recorded a payment of ₹300.00 to Olive.", statuses "Recorded" and "Voided" (icon and word). Never "sent", "transferred" or anything suggesting the app moved or checked money. Recording has a review step that shows who paid whom, the amount and currency, the date and the note, says what the record does to the balances, and that the app can't check the payment happened.
 
 ## Interaction states and forms
 
