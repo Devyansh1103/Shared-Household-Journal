@@ -1,27 +1,28 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRightIcon, PlusIcon, ReceiptIcon } from "lucide-react";
-import { Amount } from "@/components/amount";
-import { EmptyState } from "@/components/empty-state";
+import { io } from "next/cache";
+import { PlusIcon, XIcon } from "lucide-react";
 import { FormAlert } from "@/components/form-alert";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
-import { Section } from "@/components/layout/section";
-import { StatusBadge } from "@/components/status-badge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { categoryLabel } from "@/lib/expenses/categories";
+import { todayIn } from "@/lib/expenses/dates";
 import {
-  LIST_LIMIT,
-  listExpenses,
-  type ExpenseListItem,
-} from "@/lib/expenses/queries";
-import { formatDate } from "@/lib/format";
-import { getHousehold } from "@/lib/households/queries";
+  activeFilterChips,
+  activeFilterCount,
+  historySearchParams,
+  parseHistoryQuery,
+  readHistoryQuery,
+  type HistoryFilters as Filters,
+} from "@/lib/expenses/history";
+import { currencyExponent } from "@/lib/format";
+import { getHousehold, listHouseholdPeople } from "@/lib/households/queries";
+import { HistoryFilters } from "./history-filters";
+import { HistoryResults, ResultsSkeleton } from "./history-results";
 
-export const metadata: Metadata = { title: "Expenses" };
+export const metadata: Metadata = { title: "Expense history" };
 
 export default function ExpensesPage({
   params,
@@ -29,24 +30,45 @@ export default function ExpensesPage({
 }: PageProps<"/households/[householdId]/expenses">) {
   return (
     <PageContainer className="space-y-8">
-      <Suspense fallback={<ListSkeleton />}>
-        <Expenses params={params} searchParams={searchParams} />
+      <Suspense fallback={<HistorySkeleton />}>
+        <ExpenseHistory params={params} searchParams={searchParams} />
       </Suspense>
     </PageContainer>
   );
 }
 
-async function Expenses({
+async function ExpenseHistory({
   params,
   searchParams,
 }: PageProps<"/households/[householdId]/expenses">) {
   const { householdId } = await params;
   const household = await getHousehold(householdId);
-  const [{ active, deleted, truncated }, query] = await Promise.all([
-    listExpenses(household.id),
+  const [people, query] = await Promise.all([
+    listHouseholdPeople(household.id),
     searchParams,
   ]);
+  // "Today", "this week" and the like are the household's own days (D11),
+  // worked out at request time.
+  await io();
+  const today = todayIn(household.timezone);
+  const exponent = currencyExponent(household.currencyCode);
   const base = `/households/${household.id}/expenses`;
+
+  const raw = readHistoryQuery(query);
+  const parsed = parseHistoryQuery(raw, {
+    today,
+    exponent,
+    payerIds: people.map((p) => p.userId),
+  });
+  const labelled = people.map((person) => ({
+    userId: person.userId,
+    label:
+      person.userId === household.myUserId
+        ? `${person.displayName} (you)`
+        : person.isActive
+          ? person.displayName
+          : `${person.displayName} (left)`,
+  }));
 
   const addButton = (
     <Button asChild>
@@ -61,111 +83,116 @@ async function Expenses({
     <div className="space-y-8">
       {query.deleted === "1" ? (
         <FormAlert tone="success">
-          The expense is deleted. It no longer counts, and it&apos;s listed
-          under “Deleted expenses” below.
+          The expense is deleted. It no longer counts towards anything, and the
+          owner can restore it.{" "}
+          <Link
+            href={`${base}?status=deleted`}
+            className="rounded-sm text-primary underline underline-offset-4"
+          >
+            See deleted expenses
+          </Link>
         </FormAlert>
       ) : null}
 
       <PageHeader
-        title="Expenses"
-        description={`Shared costs for ${household.name}, newest first.`}
-        actions={active.length > 0 ? addButton : undefined}
+        title="Expense history"
+        description={`Every shared cost for ${household.name}. Search, filter and sort them; the figures count only the expenses that match.`}
+        actions={addButton}
       />
 
-      {active.length === 0 ? (
-        <EmptyState
-          icon={<ReceiptIcon />}
-          title="No expenses yet"
-          description="Add the first shared cost, like rent or a grocery run, and choose how to split it."
-          action={addButton}
-        />
-      ) : (
-        <div className="space-y-3">
-          <ExpenseRows
-            items={active}
-            base={base}
-            currency={household.currencyCode}
-          />
-          {truncated ? (
-            <p className="type-help">
-              Showing the latest {LIST_LIMIT} expenses. Older ones will be
-              reachable once expense history and filters arrive.
-            </p>
-          ) : null}
-        </div>
-      )}
+      {/* Keyed by the URL's filters: the form's fields are uncontrolled, so
+          after a navigation (a chip removed, "Clear all") it starts again from
+          the new URL instead of keeping what was typed before. */}
+      <HistoryFilters
+        key={JSON.stringify(raw)}
+        base={base}
+        raw={raw}
+        errors={parsed.ok ? {} : parsed.errors}
+        people={labelled}
+        currency={household.currencyCode}
+        exponent={exponent}
+        activeCount={parsed.ok ? activeFilterCount(parsed.filters) : 0}
+      />
 
-      {deleted.length > 0 ? (
-        <Section
-          title="Deleted expenses"
-          description="These don't count towards anything. The owner can restore them."
-        >
-          <ExpenseRows
-            items={deleted}
-            base={base}
-            currency={household.currencyCode}
+      {parsed.ok ? (
+        <>
+          <ActiveFilters
+            chips={activeFilterChips(parsed.filters, {
+              base,
+              exponent,
+              currency: household.currencyCode,
+              people: labelled,
+            })}
+            clearHref={base}
           />
-        </Section>
-      ) : null}
+          {/* A new key for every view, so changing filters, the sort or the
+              page shows the loading state rather than the old figures. */}
+          <Suspense
+            key={viewKey(parsed.filters, exponent)}
+            fallback={<ResultsSkeleton />}
+          >
+            <HistoryResults
+              household={household}
+              filters={parsed.filters}
+              base={base}
+              exponent={exponent}
+              addButton={addButton}
+            />
+          </Suspense>
+        </>
+      ) : (
+        <FormAlert tone="error">
+          Some of these filters can&apos;t be used, so no expenses are shown.
+          Fix the ones marked in the filters above, or clear them all.
+        </FormAlert>
+      )}
     </div>
   );
 }
 
-function ExpenseRows({
-  items,
-  base,
-  currency,
+/** The view's identity: its filters, plus the dates a preset resolved to. */
+function viewKey(filters: Filters, exponent: number): string {
+  return `${historySearchParams(filters, exponent)}|${filters.from}|${filters.to}`;
+}
+
+function ActiveFilters({
+  chips,
+  clearHref,
 }: {
-  items: ExpenseListItem[];
-  base: string;
-  currency: string;
+  chips: { key: string; label: string; href: string }[];
+  clearHref: string;
 }) {
+  if (chips.length === 0) return null;
   return (
-    <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-      {items.map((expense) => (
-        <li key={expense.id} className="min-w-0">
-          <Link
-            href={`${base}/${expense.id}`}
-            className="flex items-center gap-3 p-4 hover:bg-muted"
-          >
-            <span className="block min-w-0 flex-1 space-y-1">
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="min-w-0 truncate type-card-title">
-                  {expense.description}
-                </span>
-                {expense.deletedAt ? (
-                  <StatusBadge status="neutral">Deleted</StatusBadge>
-                ) : null}
-              </span>
-              <span className="flex flex-wrap items-center gap-x-2 gap-y-1 type-secondary">
-                <Badge variant="outline">
-                  {categoryLabel(expense.category)}
-                </Badge>
-                <span>{formatDate(expense.expenseDate)}</span>
-                <span aria-hidden="true">·</span>
-                <span className="min-w-0 truncate">
-                  Paid by {expense.payerName}
-                </span>
-              </span>
-            </span>
-            <Amount
-              minor={expense.amountMinor}
-              currency={currency}
-              tone={expense.deletedAt ? "muted" : "neutral"}
-              className={expense.deletedAt ? "line-through" : undefined}
-            />
-            <ChevronRightIcon
-              aria-hidden="true"
-              className="size-5 shrink-0 text-muted-foreground"
-            />
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-wrap items-center gap-2">
+      <p id="active-filters" className="type-label">
+        Showing only:
+      </p>
+      <ul aria-labelledby="active-filters" className="flex flex-wrap gap-2">
+        {chips.map((chip) => (
+          <li key={chip.key} className="max-w-full">
+            <Link
+              href={chip.href}
+              aria-label={`Remove filter: ${chip.label}`}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 type-label hover:bg-muted"
+            >
+              <span className="min-w-0 truncate">{chip.label}</span>
+              <XIcon aria-hidden="true" className="size-3.5 shrink-0" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <Link
+        href={clearHref}
+        className="rounded-sm type-label text-primary underline-offset-4 hover:underline"
+      >
+        Clear all
+      </Link>
+    </div>
   );
 }
 
-function ListSkeleton() {
+function HistorySkeleton() {
   return (
     <div
       role="status"
@@ -173,7 +200,9 @@ function ListSkeleton() {
       aria-label="Loading expenses"
       className="space-y-6"
     >
-      <Skeleton className="h-9 w-48" />
+      <Skeleton className="h-9 w-56" />
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-14 w-full" />
       <div className="space-y-2">
         <Skeleton className="h-16 w-full" />
         <Skeleton className="h-16 w-full" />

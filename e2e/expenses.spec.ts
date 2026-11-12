@@ -143,10 +143,12 @@ test("add, view, edit, delete and restore an expense", async ({ page }) => {
     .click();
   await expect(
     page
-      .getByRole("heading", { level: 1, name: "Expenses" })
+      .getByRole("heading", { level: 1, name: "Expense history" })
       .locator("visible=true"),
   ).toBeVisible();
+  // The row in the list (the summary above it links the largest expense too).
   const row = page
+    .locator("section")
     .getByRole("link", { name: new RegExp(title) })
     .locator("visible=true");
   await expect(row).toBeVisible();
@@ -168,12 +170,21 @@ test("add, view, edit, delete and restore an expense", async ({ page }) => {
   ).toBeFocused();
   await dialog.getByRole("button", { name: "Delete expense" }).click();
   await page.waitForURL(/\/expenses\?deleted=1/);
+  // Deleted expenses are one filter away in the history (D7).
+  await page
+    .getByRole("link", { name: "See deleted expenses" })
+    .locator("visible=true")
+    .click();
+  await page.waitForURL(/status=deleted/);
   await expect(
-    page.getByRole("heading", { name: "Deleted expenses" }),
+    page
+      .getByRole("heading", { name: "Deleted expenses" })
+      .locator("visible=true"),
   ).toBeVisible();
 
   // The owner restores it.
   await page
+    .locator("section")
     .getByRole("link", { name: new RegExp(title) })
     .locator("visible=true")
     .click();

@@ -125,6 +125,24 @@ single units differently, at most one unit per share, and everyone in the househ
 | [form.test.ts](../src/lib/expenses/form.test.ts)                                                                       | Server-side validation with members and currency                                                                                                                                                  |
 | [split-engine.test.ts](../supabase/tests/split-engine.test.ts), [expenses.test.ts](../supabase/tests/expenses.test.ts) | The database stores exactly what the engine produces and refuses broken splits                                                                                                                    |
 
+## Expense history figures
+
+Roadmap Phase 12 ([database.md](database.md#expense-history-roadmap-phase-12)). The history's summary
+counts only the expenses that match the filters, and never a deleted one (D7). A household has one
+currency (D1), so its figures never mix currencies.
+
+- **Amount filters** are typed like any amount: `parseAmount` with the household currency's ISO
+  decimal places, exact, more than zero, both ends included. "100.5" is refused for yen, never
+  rounded.
+- **Total and largest** are exact sums and amounts in minor units (text, parsed with `BigInt`).
+- **Average** is the total divided by the count, rounded to the nearest minor unit with halves away
+  from zero, the way Postgres rounds `numeric`. The app recomputes it with `BigInt` (`averageOf`)
+  and refuses to show figures that differ.
+- **Share of all counted spending** is shown in basis points, rounded half up with whole numbers
+  only, as a percentage with up to two decimals.
+- **Household figures** (all counted expenses and their total) sit next to the filtered ones, so
+  the two are never confused. They equal the balances' "total spent".
+
 ## Balances
 
 Roadmap Phase 9 (ADR-005, D7, D24), with settlements since roadmap Phase 10 (D8, D9). Balances

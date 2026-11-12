@@ -192,6 +192,72 @@ signed minor units as text).
 No stored balances and no data changes. Expenses and their splits are never touched by a
 settlement (D8).
 
+## Expense history (roadmap Phase 12)
+
+Migration `20261115120000_expense_history.sql`: one read function, no tables, columns, indexes or
+data changes.
+
+`public.expense_history(target_household_id, search_text?, search_categories?, date_from?, date_to?, categories?, payers?, amount_min?, amount_max?, deleted_only?, sort_order?, page_size?, page_number?)`
+is `security invoker` and `stable`, `EXECUTE` for `authenticated` only. It raises `42501` unless
+the caller is an active member, and RLS applies as well. Everything in its answer comes from one
+snapshot:
+
+- **Rows:** one page of the household's counted expenses (D7), or only the deleted ones, filtered
+  by every argument given (all of them together):
+  - the search text anywhere in the description, ignoring case, or a category the app matched
+    from D17's labels. Plain string functions on a parameter (`strpos(lower(…), lower(…))`), so
+    `%`, `_` or anything else typed is never a wildcard or SQL;
+  - inclusive calendar dates, categories, payers, and an inclusive minimum and maximum in minor
+    units.
+- **Order:** deterministic, with the id as the last tie-breaker, so each row has one position and
+  pages never overlap or skip (while the data stays the same):
+
+  | `sort_order` | Order                           |
+  | ------------ | ------------------------------- |
+  | `newest`     | date ↓, added ↓, id ↓ (default) |
+  | `oldest`     | date ↑, added ↑, id ↑           |
+  | `highest`    | amount ↓, then as `newest`      |
+  | `lowest`     | amount ↑, then as `newest`      |
+  | `recent`     | added ↓, then as `newest`       |
+
+- **Pages:** offset pages of `page_size` (the app uses 25). A page past the end is answered with the
+  last page, so a stale link or a narrower filter never shows an empty page by mistake.
+- **Summary of what matches:** count, total, average (rounded to the nearest minor unit, halves away
+  from zero) and the largest expense. **Household figures, whatever the filters:** counted
+  expenses and their total, and how many are deleted.
+- **Money as text**, ids, dates, and each row's `created_us` (microseconds since the epoch, so the
+  app can check the order exactly).
+
+Refused with `22023`: an unknown sort, a page size outside 1–100, a page below 1, a search over 120
+characters, or a range whose start is after its end. Bad categories or ids fail as casts (`22P02`).
+The app validates all of this first ([src/lib/expenses/history.ts](../src/lib/expenses/history.ts))
+and checks the answer before showing it
+([history-payload.ts](../src/lib/expenses/history-payload.ts)): every row is this household's, once,
+matches the filters and is in the promised order; the page arithmetic holds; and the summary adds up
+(exactly equal to the household's figures when nothing filters).
+
+**Indexes.** None added. The household's rows are read once, through the Phase 8 partial indexes on
+`(household_id, expense_date, created_at) where deleted_at is null` and
+`(household_id, deleted_at) where deleted_at is not null`: each branch of the read repeats its
+index's predicate, so generic and custom plans both use them (checked with `EXPLAIN ANALYZE` on a
+household of 5,000 expenses next to one of 20,000: no sequential scans). The payer's name is one
+primary-key lookup per row on the page.
+
+**Performance, measured 2026-11-13** on committed, vacuumed local data: about 70–90 ms per call for a
+household with 5,000 expenses, and about 13 ms for the same call with RLS bypassed. Most of the time
+is the RLS policy on `expenses` (`private.is_household_member(household_id)`), checked once per row.
+Typical households, with a few hundred expenses, take a few milliseconds. If households ever grow
+much larger, an equivalent set-based policy would remove that cost; that changes a security policy,
+so it needs the owner's approval (Phase 18 hardening).
+
+Tests: [history.test.ts](../src/lib/expenses/history.test.ts) and
+[history-payload.test.ts](../src/lib/expenses/history-payload.test.ts) (the URL rules, dates,
+amounts, URLs, chips and every check),
+[supabase/tests/expense-history.test.ts](../supabase/tests/expense-history.test.ts) (search, each
+filter, each sort against plain Postgres ordering, pages, the summary against an independent tally,
+access, refused input, and that reading history changes nothing), and
+[e2e/expense-history.spec.ts](../e2e/expense-history.spec.ts) (in a browser, desktop and phone).
+
 ## Access control
 
 RLS is enabled on every table, with deny by default. Policies apply to `authenticated` only. `anon` has

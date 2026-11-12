@@ -5,31 +5,31 @@ import type { SplitMethod } from "@/domain/money/split";
 import { createClient } from "@/lib/supabase/server";
 import {
   getHousehold,
-  listMembers,
   listMembersInJoinOrder,
   type Household,
 } from "@/lib/households/queries";
 import type { ExpenseCategory } from "./categories";
+import {
+  expenseHistoryArgs,
+  HISTORY_PAGE_SIZE,
+  type HistoryFilters,
+} from "./history";
+import {
+  checkHistory,
+  parseHistoryPayload,
+  type HistoryPage,
+} from "./history-payload";
 
 // Data access for expenses. Reads run as the signed-in user under RLS; the
 // household is checked first through getHousehold (404 for non-members).
 
-export type ExpenseListItem = {
-  id: string;
-  description: string;
-  amountMinor: number;
-  category: ExpenseCategory;
-  expenseDate: string;
-  payerName: string;
-  deletedAt: string | null;
-};
-
-export type ExpenseList = {
-  active: ExpenseListItem[];
-  deleted: ExpenseListItem[];
-  /** More active expenses exist than are shown (pagination is Phase 12). */
-  truncated: boolean;
-};
+export type ExpenseHistoryView =
+  | { ok: true; history: HistoryPage }
+  | {
+      ok: false;
+      /** The figures didn't pass their checks, so none are shown. */
+      reason: "not_verified";
+    };
 
 export type ExpenseShare = {
   userId: string;
@@ -62,9 +62,6 @@ export type ExpenseDetail = {
   everyoneActive: boolean;
 };
 
-export const LIST_LIMIT = 100;
-const DELETED_LIMIT = 20;
-
 /** "Name (left)" for people who are no longer active members (D13). */
 function nameFor(
   name: string | null | undefined,
@@ -75,51 +72,44 @@ function nameFor(
   return activeIds.has(userId) ? base : `${base} (left)`;
 }
 
-const LIST_COLUMNS =
-  "id, description, amount_minor, category, expense_date, paid_by, deleted_at, payer:profiles!expenses_paid_by_fkey(display_name)";
-
-export async function listExpenses(householdId: string): Promise<ExpenseList> {
+/**
+ * One page of the household's expense history (roadmap Phase 12): searched,
+ * filtered, sorted and paged by public.expense_history as the signed-in
+ * member, under RLS, then checked (checkHistory) before anything is shown.
+ * Non-members get the household's 404 (getHousehold).
+ */
+export async function getExpenseHistory(
+  householdId: string,
+  filters: HistoryFilters,
+): Promise<ExpenseHistoryView> {
   const household = await getHousehold(householdId);
   const supabase = await createClient();
-
-  const [members, active, deleted] = await Promise.all([
-    listMembers(household.id),
-    supabase
-      .from("expenses")
-      .select(LIST_COLUMNS)
-      .eq("household_id", household.id)
-      .is("deleted_at", null)
-      .order("expense_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(LIST_LIMIT + 1),
-    supabase
-      .from("expenses")
-      .select(LIST_COLUMNS)
-      .eq("household_id", household.id)
-      .not("deleted_at", "is", null)
-      .order("deleted_at", { ascending: false })
-      .limit(DELETED_LIMIT),
-  ]);
-  if (active.error || deleted.error) {
+  const { data, error } = await supabase.rpc(
+    "expense_history",
+    expenseHistoryArgs(household.id, filters),
+  );
+  if (error) {
+    // Membership ended after getHousehold: the same answer as for anyone else.
+    if (error.code === "42501") notFound();
     throw new Error("Could not load the expenses.");
   }
 
-  const activeIds = new Set(members.map((m) => m.userId));
-  const toItem = (row: (typeof active.data)[number]): ExpenseListItem => ({
-    id: row.id,
-    description: row.description,
-    amountMinor: row.amount_minor,
-    category: row.category,
-    expenseDate: row.expense_date,
-    payerName: nameFor(row.payer?.display_name, row.paid_by, activeIds),
-    deletedAt: row.deleted_at,
-  });
-
-  return {
-    active: active.data.slice(0, LIST_LIMIT).map(toItem),
-    deleted: deleted.data.map(toItem),
-    truncated: active.data.length > LIST_LIMIT,
-  };
+  const history = parseHistoryPayload(data);
+  const check = history
+    ? checkHistory(history, {
+        householdId: household.id,
+        filters,
+        pageSize: HISTORY_PAGE_SIZE,
+      })
+    : ({ ok: false, code: "malformed" } as const);
+  if (!history || !check.ok) {
+    // The reason only: no figures, names or ids in logs.
+    console.error(
+      `Expense history failed verification: ${check.ok ? "malformed" : check.code}`,
+    );
+    return { ok: false, reason: "not_verified" };
+  }
+  return { ok: true, history };
 }
 
 /** One expense of the household, or a 404 (also for other households' ids). */

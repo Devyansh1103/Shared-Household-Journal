@@ -155,6 +155,57 @@ export const listMembersInJoinOrder = cache(
   },
 );
 
+export type HouseholdPerson = {
+  userId: string;
+  displayName: string;
+  /** False for someone who has left (D13); their records keep their name. */
+  isActive: boolean;
+};
+
+/**
+ * Everyone who is or was a member, once each: active members in the order
+ * they joined, then people who have left, by name. Past records (an
+ * expense's payer, say) can be about either.
+ */
+export const listHouseholdPeople = cache(
+  async (householdId: string): Promise<HouseholdPerson[]> => {
+    const active = await listMembersInJoinOrder(householdId);
+    const supabase = await createClient();
+    // RLS returns every membership row of the household, left ones included.
+    const { data, error } = await supabase
+      .from("household_members")
+      .select("user_id, profiles(display_name)")
+      .eq("household_id", householdId)
+      .not("left_at", "is", null);
+    if (error) throw new Error("Could not load the members.");
+
+    const activeIds = new Set(active.map((m) => m.userId));
+    const former = new Map<string, string>();
+    for (const row of data) {
+      if (activeIds.has(row.user_id)) continue; // left, then rejoined
+      former.set(row.user_id, row.profiles?.display_name ?? "Former member");
+    }
+    return [
+      ...active.map((m) => ({
+        userId: m.userId,
+        displayName: m.displayName,
+        isActive: true,
+      })),
+      ...[...former]
+        .map(([userId, displayName]) => ({
+          userId,
+          displayName,
+          isActive: false,
+        }))
+        .sort(
+          (a, b) =>
+            a.displayName.localeCompare(b.displayName, "en-IN") ||
+            (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0),
+        ),
+    ];
+  },
+);
+
 /** Active members, the owner first, then in order of joining. */
 export async function listMembers(householdId: string): Promise<Member[]> {
   const members = await listMembersInJoinOrder(householdId);

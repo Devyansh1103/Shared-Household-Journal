@@ -137,7 +137,7 @@ Built in Phase 3 (after Phase 6). Signed-in pages (`src/app/(app)/layout.tsx`) g
 - `EmptyState`: icon, title, description and a "next step" action.
 - `ErrorState`: an alert that explains what happened and what to do next, with an optional recovery action.
 - `SettlementNotice` ([src/components/settlement-notice.tsx](../src/components/settlement-notice.tsx)): D9's "Recorded in the app — no money is moved." with an icon, and optional context after it. Every settlement surface shows it: the history, the form and its review step, a payment's page, and the settlement parts of the balances pages.
-- `FormAlert` tones: `error`, `success`, `info` and `warning` (roadmap Phase 10, for D9's "more than what's owed"). The `warning` tone uses the `Alert` `warning` variant: `warning` text on `warning-subtle`, a pair `tokens.test.ts` already checks, with a triangle icon so it never relies on colour.
+- `FormAlert` tones: `error`, `success`, `info` and `warning` (roadmap Phase 10, for D9's "more than what's owed"). The expense history (Phase 12) uses `success` after a delete and `info` for a page past the end. The `warning` tone uses the `Alert` `warning` variant: `warning` text on `warning-subtle`, a pair `tokens.test.ts` already checks, with a triangle icon so it never relies on colour.
 
 **Settlement wording** ([src/lib/settlements/wording.ts](../src/lib/settlements/wording.ts), unit-tested): "Record a payment", "Payment from Pat to Olive", D9's "Pat recorded a payment of ₹300.00 to Olive.", statuses "Recorded" and "Voided" (icon and word). Never "sent", "transferred" or anything suggesting the app moved or checked money. Recording has a review step that shows who paid whom, the amount and currency, the date and the note, says what the record does to the balances, and that the app can't check the payment happened.
 
@@ -156,6 +156,26 @@ Every control has default, hover, `focus-visible` (solid 3px ring) and disabled 
 - Set `aria-invalid` on the field. Errors render in `FieldError`, which has `role="alert"`, and are linked to the field with `aria-describedby`.
 - Error messages say how to fix the problem.
 - Entered values are kept when validation fails.
+
+**Search and filters** (the expense history, roadmap Phase 12)
+
+- **The URL holds the view.** Filters are a GET form, so they work without JavaScript. With
+  JavaScript, the form navigates to a clean URL (no empty fields, no defaults), and any change goes
+  back to page 1. A view can be refreshed, bookmarked or shared.
+- **Uncontrolled fields restart after a navigation.** A filter form whose fields use `defaultValue`
+  is keyed by the URL's filters. Otherwise a value that was typed in would outlive "Clear all" or a
+  removed chip, and the next change would send it again (caught by `e2e/expense-history.spec.ts`).
+- **Active filters** show as removable chips under the form ("Showing only: …"). Each chip is a link
+  to the same view without that filter, with an `aria-label` like "Remove filter: Groceries", plus
+  "Clear all".
+- **A sort** applies as soon as it's chosen. Date ranges are presets (Today, This week, This month,
+  Previous month) or custom dates; the date fields are enabled, and sent, only for custom dates.
+- **Loading:** the results sit in a `Suspense` keyed by the view, so every change shows a skeleton,
+  never the old figures. The submit button shows a spinner while the navigation runs.
+- **Pages:** a `nav` labelled "Pages" with "Page 2 of 7" in words and First, Previous, Next and Last
+  (each with an `aria-label`). At either end they're disabled buttons, not links.
+- **Invalid filters** are marked on their fields, the filters open, and no results are shown until
+  they're fixed. An empty result says so and offers "Clear all filters".
 
 **Destructive actions**
 

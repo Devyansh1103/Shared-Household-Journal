@@ -469,6 +469,24 @@ export type Database = {
         Args: { target_household_id: string };
         Returns: undefined;
       };
+      expense_history: {
+        Args: {
+          amount_max?: number;
+          amount_min?: number;
+          categories?: Database["public"]["Enums"]["expense_category"][];
+          date_from?: string;
+          date_to?: string;
+          deleted_only?: boolean;
+          page_number?: number;
+          page_size?: number;
+          payers?: string[];
+          search_categories?: Database["public"]["Enums"]["expense_category"][];
+          search_text?: string;
+          sort_order?: string;
+          target_household_id: string;
+        };
+        Returns: Json;
+      };
       get_invite_preview: {
         Args: { token: string };
         Returns: {
