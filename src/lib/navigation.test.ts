@@ -63,6 +63,14 @@ describe("isActive", () => {
       "household",
     ]);
     expect(at(`/households/${HOUSEHOLD}/billsx`)).toEqual([]);
+    // And the shopping list and chores (roadmap Phase 15).
+    expect(at(`/households/${HOUSEHOLD}/shopping`)).toEqual(["household"]);
+    expect(at(`/households/${HOUSEHOLD}/shopping/abc/edit`)).toEqual([
+      "household",
+    ]);
+    expect(at(`/households/${HOUSEHOLD}/chores`)).toEqual(["household"]);
+    expect(at(`/households/${HOUSEHOLD}/chores/new`)).toEqual(["household"]);
+    expect(at(`/households/${HOUSEHOLD}/choresx`)).toEqual([]);
     expect(at(`/households/${HOUSEHOLD}x`)).toEqual([]);
     expect(at("/households/new")).toEqual([]);
   });

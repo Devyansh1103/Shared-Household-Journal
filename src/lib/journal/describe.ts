@@ -14,7 +14,9 @@ import { paymentTitle, recordedSentence } from "@/lib/settlements/wording";
 import {
   entryCategory,
   type BillFields,
+  type ChoreFields,
   type ExpenseChangeFields,
+  type ShoppingItemFields,
   type JournalEntity,
   type JournalEntry,
   type JournalPerson,
@@ -53,7 +55,7 @@ export type EntryDescription = {
   changes: EntryChange[];
   /** The record it's about, or the household's list it belongs to. */
   link: EntryLink | null;
-  /** The expense or payment it's about isn't in the household any more. */
+  /** The record it's about isn't in the household any more. */
   unavailable: boolean;
 };
 
@@ -71,7 +73,15 @@ const CATEGORY_LABELS: Record<JournalCategory, string> = {
   expenses: "Expense",
   settlements: "Payment",
   bills: "Bill",
+  shopping: "Shopping",
+  chores: "Chore",
   household: "Household",
+};
+
+const PRIORITY_WORDS: Record<ChoreFields["priority"], string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
 };
 
 const METHOD_LABELS: Record<ExpenseChangeFields["splitMethod"], string> = {
@@ -187,6 +197,99 @@ export function entryDescriber(
       label: "View bill",
       accessibleLabel: `View bill: ${description}`,
     };
+  }
+
+  // Items and chores have no page of their own: the link is to the list
+  // they're on, while they're still on it. Every one goes to the same place.
+  function listLink(
+    entity: JournalEntity | null,
+    href: string,
+    label: string,
+  ): EntryLink | null {
+    if (!entity?.available || entity.state === "removed") return null;
+    return { href, label, accessibleLabel: label };
+  }
+  const shoppingLink = (entity: JournalEntity | null) =>
+    listLink(entity, `${base}/shopping`, "View shopping list");
+  const choresLink = (entity: JournalEntity | null) =>
+    listLink(entity, `${base}/chores`, "View chores");
+
+  const itemName = (item: Pick<ShoppingItemFields, "name" | "quantity">) =>
+    item.quantity ? `${item.name} (${item.quantity})` : item.name;
+  const assignee = (userId: string | null) =>
+    userId === null ? "nobody" : mention(subject(userId));
+
+  function shoppingChanges(
+    before: ShoppingItemFields,
+    after: ShoppingItemFields,
+    noteChanged: boolean,
+  ): EntryChange[] {
+    const changes: EntryChange[] = [];
+    if (before.name !== after.name) {
+      changes.push({
+        kind: "value",
+        label: "Item",
+        from: `“${before.name}”`,
+        to: `“${after.name}”`,
+      });
+    }
+    if (before.quantity !== after.quantity) {
+      changes.push({
+        kind: "value",
+        label: "Quantity",
+        from: before.quantity ?? "none",
+        to: after.quantity ?? "none",
+      });
+    }
+    if (before.assigneeId !== after.assigneeId) {
+      changes.push({
+        kind: "value",
+        label: "Getting it",
+        from: assignee(before.assigneeId),
+        to: assignee(after.assigneeId),
+      });
+    }
+    if (noteChanged)
+      changes.push({ kind: "text", label: "Note", text: "changed" });
+    return changes;
+  }
+
+  function choreChanges(
+    before: ChoreFields,
+    after: ChoreFields,
+    descriptionChanged: boolean,
+  ): EntryChange[] {
+    const changes: EntryChange[] = [];
+    const value = (label: string, from: string, to: string) =>
+      changes.push({ kind: "value", label, from, to });
+    if (before.title !== after.title) {
+      value("Chore", `“${before.title}”`, `“${after.title}”`);
+    }
+    if (before.assigneeId !== after.assigneeId) {
+      value(
+        "Assigned to",
+        assignee(before.assigneeId),
+        assignee(after.assigneeId),
+      );
+    }
+    if (before.dueOn !== after.dueOn) {
+      value(
+        "Due date",
+        before.dueOn ? formatDate(before.dueOn) : "none",
+        after.dueOn ? formatDate(after.dueOn) : "none",
+      );
+    }
+    if (before.priority !== after.priority) {
+      value(
+        "Priority",
+        PRIORITY_WORDS[before.priority],
+        PRIORITY_WORDS[after.priority],
+      );
+    }
+    if (descriptionChanged) {
+      changes.push({ kind: "text", label: "Details", text: "changed" });
+    }
+    return changes;
   }
 
   const schedule = (bill: BillFields) =>
@@ -469,6 +572,79 @@ export function entryDescriber(
         result.link = billLink(entry.entity, detail.description);
         break;
       }
+      case "shopping_item_added": {
+        const { item } = detail;
+        result.title = `${lead(actor)} added an item to the shopping list`;
+        result.summary = itemName(item);
+        if (item.assigneeId) {
+          result.context.push(
+            `For ${mention(subject(item.assigneeId))} to get`,
+          );
+        }
+        result.link = shoppingLink(entry.entity);
+        break;
+      }
+      case "shopping_item_updated":
+        result.title = `${lead(actor)} changed an item on the shopping list`;
+        result.summary = itemName(detail.after);
+        result.changes = shoppingChanges(
+          detail.before,
+          detail.after,
+          detail.noteChanged,
+        );
+        result.link = shoppingLink(entry.entity);
+        break;
+      case "shopping_item_purchased":
+      case "shopping_item_reopened":
+      case "shopping_item_removed":
+        result.title = {
+          shopping_item_purchased: `${lead(actor)} bought an item on the shopping list`,
+          shopping_item_reopened: `${lead(actor)} put an item back on the shopping list`,
+          shopping_item_removed: `${lead(actor)} removed an item from the shopping list`,
+        }[detail.type];
+        result.summary = itemName(detail);
+        if (detail.type === "shopping_item_purchased") {
+          result.context.push("Not recorded as an expense");
+        }
+        result.link = shoppingLink(entry.entity);
+        break;
+      case "chore_created": {
+        const { chore } = detail;
+        result.title = `${lead(actor)} added a chore`;
+        result.summary = chore.title;
+        result.context.push(
+          chore.assigneeId
+            ? `Assigned to ${mention(subject(chore.assigneeId))}`
+            : "Assigned to nobody",
+        );
+        if (chore.dueOn) result.context.push(`Due ${formatDate(chore.dueOn)}`);
+        if (chore.priority !== "medium") {
+          result.context.push(`${PRIORITY_WORDS[chore.priority]} priority`);
+        }
+        result.link = choresLink(entry.entity);
+        break;
+      }
+      case "chore_updated":
+        result.title = `${lead(actor)} changed a chore`;
+        result.summary = detail.after.title;
+        result.changes = choreChanges(
+          detail.before,
+          detail.after,
+          detail.descriptionChanged,
+        );
+        result.link = choresLink(entry.entity);
+        break;
+      case "chore_completed":
+      case "chore_reopened":
+      case "chore_removed":
+        result.title = {
+          chore_completed: `${lead(actor)} completed a chore`,
+          chore_reopened: `${lead(actor)} reopened a chore`,
+          chore_removed: `${lead(actor)} removed a chore`,
+        }[detail.type];
+        result.summary = detail.title;
+        result.link = choresLink(entry.entity);
+        break;
     }
     return result;
   };

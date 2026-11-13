@@ -44,6 +44,16 @@ export const ENTRY_CATEGORIES = {
   bill_ended: "bills",
   bill_skipped: "bills",
   bill_unskipped: "bills",
+  shopping_item_added: "shopping",
+  shopping_item_updated: "shopping",
+  shopping_item_purchased: "shopping",
+  shopping_item_reopened: "shopping",
+  shopping_item_removed: "shopping",
+  chore_created: "chores",
+  chore_updated: "chores",
+  chore_completed: "chores",
+  chore_reopened: "chores",
+  chore_removed: "chores",
 } as const satisfies Record<EventType, JournalCategory>;
 
 export type JournalEntryType = keyof typeof ENTRY_CATEGORIES;
@@ -101,6 +111,22 @@ const billSchema = z.strictObject({
   ends_on: z.iso.date().nullable(),
 });
 const billNameSchema = z.strictObject({ description: z.string() });
+const shoppingItemSchema = z.strictObject({
+  name: z.string(),
+  quantity: z.string().nullable(),
+  assignee_id: id.nullable(),
+});
+const shoppingNameSchema = z.strictObject({
+  name: z.string(),
+  quantity: z.string().nullable(),
+});
+const choreSchema = z.strictObject({
+  title: z.string(),
+  assignee_id: id.nullable(),
+  due_on: z.iso.date().nullable(),
+  priority: z.enum(["low", "medium", "high"]),
+});
+const choreTitleSchema = z.strictObject({ title: z.string() });
 const billPeriodSchema = z.strictObject({
   description: z.string(),
   due_on: z.iso.date(),
@@ -134,7 +160,36 @@ const detailSchemas = {
   }),
   bill_skipped: billPeriodSchema,
   bill_unskipped: billPeriodSchema,
+  shopping_item_added: shoppingItemSchema,
+  shopping_item_updated: z.strictObject({
+    before: shoppingItemSchema,
+    after: shoppingItemSchema,
+    note_changed: z.boolean(),
+  }),
+  shopping_item_purchased: shoppingNameSchema,
+  shopping_item_reopened: shoppingNameSchema,
+  shopping_item_removed: shoppingNameSchema,
+  chore_created: choreSchema,
+  chore_updated: z.strictObject({
+    before: choreSchema,
+    after: choreSchema,
+    description_changed: z.boolean(),
+  }),
+  chore_completed: choreTitleSchema,
+  chore_reopened: choreTitleSchema,
+  chore_removed: choreTitleSchema,
 } satisfies Record<JournalEntryType, z.ZodType>;
+
+const ENTITY_STATE_VALUES = [
+  "active",
+  "deleted",
+  "voided",
+  "paused",
+  "ended",
+  "purchased",
+  "completed",
+  "removed",
+] as const;
 
 const entitySchema = z
   .union([
@@ -142,7 +197,7 @@ const entitySchema = z
     z.strictObject({
       available: z.literal(true),
       id,
-      state: z.enum(["active", "deleted", "voided", "paused", "ended"]),
+      state: z.enum(ENTITY_STATE_VALUES),
     }),
   ])
   .nullable();
@@ -223,7 +278,48 @@ export type JournalDetail =
       type: "bill_skipped" | "bill_unskipped";
       description: string;
       dueOn: string;
+    }
+  | { type: "shopping_item_added"; item: ShoppingItemFields }
+  | {
+      type: "shopping_item_updated";
+      before: ShoppingItemFields;
+      after: ShoppingItemFields;
+      /** The note changed (the note itself stays out). */
+      noteChanged: boolean;
+    }
+  | {
+      type:
+        | "shopping_item_purchased"
+        | "shopping_item_reopened"
+        | "shopping_item_removed";
+      name: string;
+      quantity: string | null;
+    }
+  | { type: "chore_created"; chore: ChoreFields }
+  | {
+      type: "chore_updated";
+      before: ChoreFields;
+      after: ChoreFields;
+      /** The details changed (the details themselves stay out). */
+      descriptionChanged: boolean;
+    }
+  | {
+      type: "chore_completed" | "chore_reopened" | "chore_removed";
+      title: string;
     };
+
+export type ShoppingItemFields = {
+  name: string;
+  quantity: string | null;
+  assigneeId: string | null;
+};
+
+export type ChoreFields = {
+  title: string;
+  assigneeId: string | null;
+  dueOn: string | null;
+  priority: "low" | "medium" | "high";
+};
 
 export type BillFields = {
   description: string;
@@ -238,16 +334,16 @@ export type BillFields = {
 };
 
 /**
- * The expense, payment or bill an entry is about, as it is now: null for
- * other entries; unavailable if it isn't in this household (nothing to link
- * to).
+ * The expense, payment, bill, shopping item or chore an entry is about, as it
+ * is now: null for other entries; unavailable if it isn't in this household
+ * (nothing to link to).
  */
 export type JournalEntity =
   | { available: false }
   | {
       available: true;
       id: string;
-      state: "active" | "deleted" | "voided" | "paused" | "ended";
+      state: (typeof ENTITY_STATE_VALUES)[number];
     };
 
 export type JournalEntry = {
@@ -319,6 +415,25 @@ function billFields(value: z.infer<typeof billSchema>): BillFields {
     every: value.interval_count,
     anchorOn: value.anchor_on,
     endsOn: value.ends_on,
+  };
+}
+
+function shoppingItemFields(
+  value: z.infer<typeof shoppingItemSchema>,
+): ShoppingItemFields {
+  return {
+    name: value.name,
+    quantity: value.quantity,
+    assigneeId: value.assignee_id,
+  };
+}
+
+function choreFields(value: z.infer<typeof choreSchema>): ChoreFields {
+  return {
+    title: value.title,
+    assigneeId: value.assignee_id,
+    dueOn: value.due_on,
+    priority: value.priority,
   };
 }
 
@@ -411,6 +526,50 @@ function parseDetail(
         ? { type, description: d.data.description, dueOn: d.data.due_on }
         : null;
     }
+    case "shopping_item_added": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success ? { type, item: shoppingItemFields(d.data) } : null;
+    }
+    case "shopping_item_updated": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success
+        ? {
+            type,
+            before: shoppingItemFields(d.data.before),
+            after: shoppingItemFields(d.data.after),
+            noteChanged: d.data.note_changed,
+          }
+        : null;
+    }
+    case "shopping_item_purchased":
+    case "shopping_item_reopened":
+    case "shopping_item_removed": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success
+        ? { type, name: d.data.name, quantity: d.data.quantity }
+        : null;
+    }
+    case "chore_created": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success ? { type, chore: choreFields(d.data) } : null;
+    }
+    case "chore_updated": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success
+        ? {
+            type,
+            before: choreFields(d.data.before),
+            after: choreFields(d.data.after),
+            descriptionChanged: d.data.description_changed,
+          }
+        : null;
+    }
+    case "chore_completed":
+    case "chore_reopened":
+    case "chore_removed": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success ? { type, title: d.data.title } : null;
+    }
   }
 }
 
@@ -495,6 +654,8 @@ const ENTITY_STATES: Record<
   expenses: ["active", "deleted"],
   settlements: ["active", "voided"],
   bills: ["active", "paused", "ended"],
+  shopping: ["active", "purchased", "removed"],
+  chores: ["active", "completed", "removed"],
 };
 
 /** The record an entry may be about, and the states that record can be in. */

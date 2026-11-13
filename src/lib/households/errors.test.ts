@@ -34,6 +34,17 @@ describe("householdErrorMessage", () => {
     }
   });
 
+  it("explains every shopping and chore code in plain words (roadmap Phase 15)", () => {
+    for (let n = 26; n <= 30; n++) {
+      const code = `HJ0${n}`;
+      const message = householdErrorMessage(code);
+      expect(message, code).not.toBe(GENERIC_ERROR);
+      expect(message, code).not.toMatch(/HJ0|shopping_item|sqlstate/i);
+    }
+    expect(householdErrorMessage("HJ026")).toMatch(/shopping list/);
+    expect(householdErrorMessage("HJ027")).toMatch(/chore/);
+  });
+
   it("falls back to a generic message for unknown or missing codes", () => {
     expect(householdErrorMessage("XX999")).toBe(GENERIC_ERROR);
     expect(householdErrorMessage(undefined)).toBe(GENERIC_ERROR);

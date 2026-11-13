@@ -559,8 +559,198 @@ describe("bill entries (roadmap Phase 14)", () => {
   });
 });
 
+describe("shopping and chore entries (roadmap Phase 15)", () => {
+  const ITEM = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+  const CHORE = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const milk = { name: "Milk", quantity: "1 litre", assigneeId: PAT };
+  const bins = {
+    title: "Take out the bins",
+    assigneeId: QUIN,
+    dueOn: "2026-11-14",
+    priority: "high" as const,
+  };
+  const item = (state: "active" | "purchased" | "removed"): JournalEntity => ({
+    available: true,
+    id: ITEM,
+    state,
+  });
+  const chore = (state: "active" | "completed" | "removed"): JournalEntity => ({
+    available: true,
+    id: CHORE,
+    state,
+  });
+
+  it("say who added an item, for whom, and link to the list", () => {
+    expect(
+      describeForPat(
+        entry(
+          { type: "shopping_item_added", item: milk },
+          { entity: item("active") },
+        ),
+      ),
+    ).toEqual({
+      category: "shopping",
+      categoryLabel: "Shopping",
+      title: "Olive added an item to the shopping list",
+      summary: "Milk (1 litre)",
+      context: ["For you to get"],
+      changes: [],
+      link: {
+        href: `/households/${HOUSEHOLD}/shopping`,
+        label: "View shopping list",
+        accessibleLabel: "View shopping list",
+      },
+      unavailable: false,
+    });
+  });
+
+  it("list an item's changes, and only flag a changed note", () => {
+    const d = describeForPat(
+      entry(
+        {
+          type: "shopping_item_updated",
+          before: milk,
+          after: { name: "Oat milk", quantity: null, assigneeId: null },
+          noteChanged: true,
+        },
+        { entity: item("active") },
+      ),
+    );
+    expect(d.changes).toEqual([
+      { kind: "value", label: "Item", from: "“Milk”", to: "“Oat milk”" },
+      { kind: "value", label: "Quantity", from: "1 litre", to: "none" },
+      { kind: "value", label: "Getting it", from: "you", to: "nobody" },
+      { kind: "text", label: "Note", text: "changed" },
+    ]);
+  });
+
+  it("say an item was bought without calling it an expense", () => {
+    const d = describeForPat(
+      entry(
+        { type: "shopping_item_purchased", name: "Milk", quantity: null },
+        { actorId: PAT, entity: item("purchased") },
+      ),
+    );
+    expect(d).toMatchObject({
+      title: "You bought an item on the shopping list",
+      summary: "Milk",
+      context: ["Not recorded as an expense"],
+    });
+    // A removed item isn't on the list any more: nothing to link to.
+    expect(
+      describeForPat(
+        entry(
+          { type: "shopping_item_removed", name: "Milk", quantity: null },
+          { entity: item("removed") },
+        ),
+      ),
+    ).toMatchObject({
+      title: "Olive removed an item from the shopping list",
+      link: null,
+      unavailable: false,
+    });
+  });
+
+  it("say who added a chore, for whom, when and how urgent", () => {
+    const d = describeForPat(
+      entry(
+        { type: "chore_created", chore: bins },
+        { entity: chore("active") },
+      ),
+    );
+    expect(d).toMatchObject({
+      category: "chores",
+      categoryLabel: "Chore",
+      title: "Olive added a chore",
+      summary: "Take out the bins",
+      context: ["Assigned to Quin (left)", "Due 14 Nov 2026", "High priority"],
+      link: { href: `/households/${HOUSEHOLD}/chores`, label: "View chores" },
+    });
+    expect(
+      describeForPat(
+        entry(
+          {
+            type: "chore_created",
+            chore: {
+              ...bins,
+              assigneeId: null,
+              dueOn: null,
+              priority: "medium",
+            },
+          },
+          { entity: chore("active") },
+        ),
+      ).context,
+    ).toEqual(["Assigned to nobody"]);
+  });
+
+  it("list a chore's changes, including a reassignment", () => {
+    const d = describeForPat(
+      entry(
+        {
+          type: "chore_updated",
+          before: bins,
+          after: { ...bins, assigneeId: PAT, dueOn: null, priority: "low" },
+          descriptionChanged: true,
+        },
+        { entity: chore("active") },
+      ),
+    );
+    expect(d.title).toBe("Olive changed a chore");
+    expect(d.changes).toEqual([
+      { kind: "value", label: "Assigned to", from: "Quin (left)", to: "you" },
+      { kind: "value", label: "Due date", from: "14 Nov 2026", to: "none" },
+      { kind: "value", label: "Priority", from: "High", to: "Low" },
+      { kind: "text", label: "Details", text: "changed" },
+    ]);
+  });
+
+  it("say who completed, reopened or removed a chore", () => {
+    const title = (
+      type: "chore_completed" | "chore_reopened" | "chore_removed",
+    ) =>
+      describeForPat(
+        entry(
+          { type, title: "Take out the bins" },
+          { entity: chore("completed") },
+        ),
+      ).title;
+    expect(title("chore_completed")).toBe("Olive completed a chore");
+    expect(title("chore_reopened")).toBe("Olive reopened a chore");
+    expect(title("chore_removed")).toBe("Olive removed a chore");
+  });
+});
+
 describe("every entry", () => {
   const all: JournalEntry[] = [
+    entry(
+      {
+        type: "shopping_item_updated",
+        before: { name: "Milk", quantity: null, assigneeId: GONE },
+        after: { name: "Milk", quantity: null, assigneeId: null },
+        noteChanged: false,
+      },
+      { actorId: GONE, entity: { available: false } },
+    ),
+    entry(
+      {
+        type: "chore_updated",
+        before: {
+          title: "Bins",
+          assigneeId: GONE,
+          dueOn: null,
+          priority: "low",
+        },
+        after: {
+          title: "Bins",
+          assigneeId: OLIVE,
+          dueOn: null,
+          priority: "low",
+        },
+        descriptionChanged: false,
+      },
+      { actorId: GONE, entity: { available: false } },
+    ),
     entry(
       {
         type: "bill_updated",

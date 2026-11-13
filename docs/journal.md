@@ -14,21 +14,29 @@ amount from the journal to calculate anything, and writing or reading the journa
 
 ## What it shows
 
-| Filter      | Event                   | Entry (as Pat sees it)                          | Links to                             |
-| ----------- | ----------------------- | ----------------------------------------------- | ------------------------------------ |
-| Household   | `household_created`     | Olive created the household “Flat 4B”           | —                                    |
-|             | `member_joined`         | Raj joined the household · Invited by Olive     | Members (`/households/[id]#members`) |
-|             | `member_left`           | Quin left the household                         | Members                              |
-|             | `member_removed`        | Olive removed Quin from the household           | Members                              |
-|             | `ownership_transferred` | Olive made you the owner                        | Members                              |
-|             | `invitation_created`    | Olive created an invite link                    | Invite links (`#invite-links`)       |
-|             | `invitation_revoked`    | Olive revoked an invite link · Created by Raj   | Invite links                         |
-| Expenses    | `expense_created`       | Olive added an expense · Groceries — ₹1,250.00  | The expense                          |
-|             | `expense_updated`       | Olive edited an expense, and what changed (D6)  | The expense                          |
-|             | `expense_deleted`       | Olive deleted an expense                        | The expense ("View deleted expense") |
-|             | `expense_restored`      | Olive restored an expense                       | The expense                          |
-| Settlements | `settlement_recorded`   | You recorded a payment of ₹500.00 to Olive (D9) | The payment                          |
-|             | `settlement_voided`     | Olive voided a payment · It no longer counts    | The payment ("View voided payment")  |
+| Filter      | Event                                                | Entry (as Pat sees it)                                                                            | Links to                             |
+| ----------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Household   | `household_created`                                  | Olive created the household “Flat 4B”                                                             | —                                    |
+|             | `member_joined`                                      | Raj joined the household · Invited by Olive                                                       | Members (`/households/[id]#members`) |
+|             | `member_left`                                        | Quin left the household                                                                           | Members                              |
+|             | `member_removed`                                     | Olive removed Quin from the household                                                             | Members                              |
+|             | `ownership_transferred`                              | Olive made you the owner                                                                          | Members                              |
+|             | `invitation_created`                                 | Olive created an invite link                                                                      | Invite links (`#invite-links`)       |
+|             | `invitation_revoked`                                 | Olive revoked an invite link · Created by Raj                                                     | Invite links                         |
+| Expenses    | `expense_created`                                    | Olive added an expense · Groceries — ₹1,250.00                                                    | The expense                          |
+|             | `expense_updated`                                    | Olive edited an expense, and what changed (D6)                                                    | The expense                          |
+|             | `expense_deleted`                                    | Olive deleted an expense                                                                          | The expense ("View deleted expense") |
+|             | `expense_restored`                                   | Olive restored an expense                                                                         | The expense                          |
+| Settlements | `settlement_recorded`                                | You recorded a payment of ₹500.00 to Olive (D9)                                                   | The payment                          |
+|             | `settlement_voided`                                  | Olive voided a payment · It no longer counts                                                      | The payment ("View voided payment")  |
+| Bills       | `bill_*` (seven types)                               | See [bills.md](bills.md#the-journal)                                                              | The bill                             |
+| Shopping    | `shopping_item_added`                                | Olive added an item to the shopping list · Milk (2) · For you to get                              | The shopping list (not once removed) |
+|             | `shopping_item_updated`                              | Olive changed an item on the shopping list, and what changed                                      | The shopping list                    |
+|             | `shopping_item_purchased`                            | You bought an item on the shopping list · Not recorded as an expense                              | The shopping list                    |
+|             | `shopping_item_reopened`, `shopping_item_removed`    | Olive put an item back on / removed an item from the shopping list                                | The shopping list (not once removed) |
+| Chores      | `chore_created`                                      | Olive added a chore · Bins · Assigned to you · Due 14 Nov 2026 · High priority                    | Chores                               |
+|             | `chore_updated`                                      | Olive changed a chore, and what changed (title, assignee, due date, priority; "Details: changed") | Chores                               |
+|             | `chore_completed`, `chore_reopened`, `chore_removed` | Pat completed / reopened / removed a chore                                                        | Chores (not once removed)            |
 
 - **Edits (D6)** list each field that changed, old → new: description, amount, category, date,
   payer, split method, and who was added to or removed from the split. "Shares: changed" appears only
@@ -90,7 +98,7 @@ every split); a settlement's full snapshot (people, amount, date, note, recorder
 otherwise, including for a household id that doesn't exist), and everything in one answer is one
 snapshot. It returns a read model, never raw events:
 
-- **An allowlist of types.** Only the 20 types above (the seven bill types since roadmap Phase 14). A type added in a later phase stays out of the
+- **An allowlist of types.** Only the 30 types above (the seven bill types since roadmap Phase 14, the five shopping and five chore types since roadmap Phase 15). A type added in a later phase stays out of the
   journal until it's added to this function and to `ENTRY_CATEGORIES` in
   [payload.ts](../src/lib/journal/payload.ts) (the TypeScript check fails until it is).
 - **Only the fields each entry needs:** names of things, amounts as text, dates, and people's ids. No
@@ -98,8 +106,12 @@ snapshot. It returns a read model, never raw events:
   emails or tokens, and no raw `summary`.
 - **People:** the display name of everyone the page mentions, and whether they're still an active
   member.
-- **Records:** for an expense or payment entry, whether that record is still in this household and
-  whether it has since been deleted or voided.
+- **Records:** for an expense, payment, bill, item or chore entry, whether that record is still in
+  this household and its state now: deleted or voided; paused or ended; bought or removed; done or
+  removed.
+- **Shopping and chores (roadmap Phase 15):** an item's name, quantity and assignee, a chore's title,
+  assignee, due date and priority. Item notes and chore descriptions stay out; an edit says only
+  that one changed.
 
 The app parses the answer with strict shapes (an unexpected field, such as a note, fails the parse)
 and checks it before showing anything ([payload.ts](../src/lib/journal/payload.ts),
@@ -116,7 +128,7 @@ entries.
   strictly older. A page never repeats or skips an entry, and entries written while someone pages
   through appear at the top, never in the older pages. The function fetches one extra row to know
   whether there are older entries; it never reads the whole history.
-- **Filters** (`?show=expenses|settlements|bills|household`) apply in SQL. Changing the filter goes back to
+- **Filters** (`?show=expenses|settlements|bills|shopping|chores|household`) apply in SQL. Changing the filter goes back to
   the newest entries.
 - **Refused input** (`22023`): an unknown filter, a page size outside 1–100, half a cursor, or a cursor
   time outside 0 to 9999-12-31. The app validates the URL first ([query.ts](../src/lib/journal/query.ts))
@@ -142,7 +154,7 @@ Household tab stays active on it: the bottom bar has room for five tabs at 360px
 settlements under Balances.
 
 - **Header:** "Household journal" and the household's name in the description.
-- **Filters:** All activity, Expenses, Settlements, Bills, Household. They're links, so each view has its
+- **Filters:** All activity, Expenses, Settlements, Bills, Shopping, Chores, Household. They're links, so each view has its
   own URL; the current one has `aria-current`, a check icon and a heavier weight.
 - **Days**, in the household's timezone (D11): Today, Yesterday, Earlier this week (from the week's
   first day, D25's `WEEK_STARTS_ON`, the same as the expense history's "This week"), then one heading
@@ -178,8 +190,9 @@ Phase 18; it changes a security policy, so it needs the owner's approval.
 - No live updates: the page shows the journal as of loading it.
 - Comments, reactions, notifications, exports and summaries aren't part of the journal (Phase 17 adds
   in-app notifications, which will read these events, D12).
-- Shopping, chores and budgets write no events yet (recurring bills do, since roadmap Phase 14); each phase adds its own types
-  (and adds them to the allowlist on purpose).
+- Budgets write no events yet (recurring bills do since roadmap Phase 14, the shopping list and
+  chores since roadmap Phase 15); each phase adds its own types (and adds them to the allowlist on
+  purpose).
 - Renaming a household isn't journalled; the app has no way to rename one.
 - Folding automatic invite revocations into a leave or removal relies on the two events sharing their
   transaction's timestamp, which holds for every revocation the functions make.

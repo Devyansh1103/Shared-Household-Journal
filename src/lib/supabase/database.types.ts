@@ -107,6 +107,97 @@ export type Database = {
           },
         ];
       };
+      chores: {
+        Row: {
+          assignee_id: string | null;
+          completed_at: string | null;
+          completed_by: string | null;
+          created_at: string;
+          created_by: string;
+          creation_key: string | null;
+          description: string | null;
+          due_on: string | null;
+          household_id: string;
+          id: string;
+          priority: Database["public"]["Enums"]["chore_priority"];
+          removed_at: string | null;
+          removed_by: string | null;
+          title: string;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          assignee_id?: string | null;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          created_at?: string;
+          created_by: string;
+          creation_key?: string | null;
+          description?: string | null;
+          due_on?: string | null;
+          household_id: string;
+          id?: string;
+          priority?: Database["public"]["Enums"]["chore_priority"];
+          removed_at?: string | null;
+          removed_by?: string | null;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          assignee_id?: string | null;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          created_at?: string;
+          created_by?: string;
+          creation_key?: string | null;
+          description?: string | null;
+          due_on?: string | null;
+          household_id?: string;
+          id?: string;
+          priority?: Database["public"]["Enums"]["chore_priority"];
+          removed_at?: string | null;
+          removed_by?: string | null;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chores_assignee_id_fkey";
+            columns: ["assignee_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chores_completed_by_fkey";
+            columns: ["completed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chores_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chores_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "chores_removed_by_fkey";
+            columns: ["removed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       expense_splits: {
         Row: {
           expense_id: string;
@@ -624,6 +715,94 @@ export type Database = {
           },
         ];
       };
+      shopping_items: {
+        Row: {
+          added_by: string;
+          assignee_id: string | null;
+          created_at: string;
+          creation_key: string | null;
+          household_id: string;
+          id: string;
+          name: string;
+          note: string | null;
+          purchased_at: string | null;
+          purchased_by: string | null;
+          quantity: string | null;
+          removed_at: string | null;
+          removed_by: string | null;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          added_by: string;
+          assignee_id?: string | null;
+          created_at?: string;
+          creation_key?: string | null;
+          household_id: string;
+          id?: string;
+          name: string;
+          note?: string | null;
+          purchased_at?: string | null;
+          purchased_by?: string | null;
+          quantity?: string | null;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          added_by?: string;
+          assignee_id?: string | null;
+          created_at?: string;
+          creation_key?: string | null;
+          household_id?: string;
+          id?: string;
+          name?: string;
+          note?: string | null;
+          purchased_at?: string | null;
+          purchased_by?: string | null;
+          quantity?: string | null;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "shopping_items_added_by_fkey";
+            columns: ["added_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shopping_items_assignee_id_fkey";
+            columns: ["assignee_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shopping_items_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shopping_items_purchased_by_fkey";
+            columns: ["purchased_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shopping_items_removed_by_fkey";
+            columns: ["removed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -635,6 +814,30 @@ export type Database = {
           already_member: boolean;
           joined_household_id: string;
         }[];
+      };
+      add_shopping_item: {
+        Args: {
+          item_assignee_id?: string;
+          item_name: string;
+          item_note?: string;
+          item_quantity?: string;
+          request_key?: string;
+          target_household_id: string;
+        };
+        Returns: string;
+      };
+      complete_chore: { Args: { target_chore_id: string }; Returns: undefined };
+      create_chore: {
+        Args: {
+          chore_assignee_id?: string;
+          chore_description?: string;
+          chore_due_on?: string;
+          chore_priority_level?: Database["public"]["Enums"]["chore_priority"];
+          chore_title: string;
+          request_key?: string;
+          target_household_id: string;
+        };
+        Returns: string;
       };
       create_expense: {
         Args: {
@@ -739,6 +942,10 @@ export type Database = {
         Args: { target_bill_id: string };
         Returns: undefined;
       };
+      purchase_shopping_item: {
+        Args: { target_item_id: string };
+        Returns: undefined;
+      };
       record_bill_payment: {
         Args: {
           amount: number;
@@ -768,8 +975,18 @@ export type Database = {
         Returns: string;
       };
       recurring_bill: { Args: { target_bill_id: string }; Returns: Json };
+      remove_chore: { Args: { target_chore_id: string }; Returns: undefined };
       remove_member: {
         Args: { member_user_id: string; target_household_id: string };
+        Returns: undefined;
+      };
+      remove_shopping_item: {
+        Args: { target_item_id: string };
+        Returns: undefined;
+      };
+      reopen_chore: { Args: { target_chore_id: string }; Returns: undefined };
+      reopen_shopping_item: {
+        Args: { target_item_id: string };
         Returns: undefined;
       };
       reschedule_recurring_bill: {
@@ -802,6 +1019,18 @@ export type Database = {
         Args: { occurrence_due_on: string; target_bill_id: string };
         Returns: undefined;
       };
+      update_chore: {
+        Args: {
+          chore_assignee_id?: string;
+          chore_description?: string;
+          chore_due_on?: string;
+          chore_priority_level?: Database["public"]["Enums"]["chore_priority"];
+          chore_title: string;
+          expected_updated_at?: string;
+          target_chore_id: string;
+        };
+        Returns: undefined;
+      };
       update_expense: {
         Args: {
           amount: number;
@@ -831,6 +1060,17 @@ export type Database = {
         };
         Returns: undefined;
       };
+      update_shopping_item: {
+        Args: {
+          expected_updated_at?: string;
+          item_assignee_id?: string;
+          item_name: string;
+          item_note?: string;
+          item_quantity?: string;
+          target_item_id: string;
+        };
+        Returns: undefined;
+      };
       void_settlement: {
         Args: { target_settlement_id: string };
         Returns: undefined;
@@ -843,7 +1083,9 @@ export type Database = {
         | "invitation"
         | "expense"
         | "settlement"
-        | "recurring_bill";
+        | "recurring_bill"
+        | "shopping_item"
+        | "chore";
       activity_event_type:
         | "household_created"
         | "member_joined"
@@ -864,8 +1106,19 @@ export type Database = {
         | "bill_resumed"
         | "bill_ended"
         | "bill_skipped"
-        | "bill_unskipped";
+        | "bill_unskipped"
+        | "shopping_item_added"
+        | "shopping_item_updated"
+        | "shopping_item_purchased"
+        | "shopping_item_reopened"
+        | "shopping_item_removed"
+        | "chore_created"
+        | "chore_updated"
+        | "chore_completed"
+        | "chore_reopened"
+        | "chore_removed";
       bill_frequency: "week" | "month" | "year";
+      chore_priority: "low" | "medium" | "high";
       expense_category:
         | "rent"
         | "utilities"
@@ -1011,6 +1264,8 @@ export const Constants = {
         "expense",
         "settlement",
         "recurring_bill",
+        "shopping_item",
+        "chore",
       ],
       activity_event_type: [
         "household_created",
@@ -1033,8 +1288,19 @@ export const Constants = {
         "bill_ended",
         "bill_skipped",
         "bill_unskipped",
+        "shopping_item_added",
+        "shopping_item_updated",
+        "shopping_item_purchased",
+        "shopping_item_reopened",
+        "shopping_item_removed",
+        "chore_created",
+        "chore_updated",
+        "chore_completed",
+        "chore_reopened",
+        "chore_removed",
       ],
       bill_frequency: ["week", "month", "year"],
+      chore_priority: ["low", "medium", "high"],
       expense_category: [
         "rent",
         "utilities",

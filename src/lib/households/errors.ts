@@ -1,7 +1,8 @@
 // Postgres error codes from the household functions mapped to plain messages.
 // Codes HJ001–HJ005 are defined in the Phase 6 migration, HJ006–HJ012 in the
 // expenses migration, HJ013 in the balances migration, HJ014–HJ017 in the
-// settlements migration and HJ018–HJ025 in the recurring bills migration.
+// settlements migration, HJ018–HJ025 in the recurring bills migration and
+// HJ026–HJ030 in the shopping and chores migration.
 // Raw database messages are never shown.
 
 import { GENERIC_ERROR } from "@/lib/auth/errors";
@@ -49,6 +50,13 @@ const MESSAGES: Record<string, string> = {
     "That period can't be recorded or skipped yet. Only periods that have come, and the next one, can.",
   HJ025:
     "That bill period has been recorded again or skipped since this expense was deleted, so it can't be restored.",
+  HJ026: "We couldn't find that item on the shopping list.",
+  HJ027: "We couldn't find that chore.",
+  HJ028: "That's been removed, so it can't be changed. Reload the page.",
+  HJ029:
+    "Someone changed this while you were editing. Reload the page to see their changes, then try again.",
+  HJ030:
+    "That person isn't a member of this household any more. Choose someone else, or nobody.",
   "42501": "You don't have permission to do that.",
   "23514": "Some of those details aren't valid. Check them and try again.",
   "22023": "Choose a timezone from the list.",

@@ -5,6 +5,7 @@ import {
   CalendarCogIcon,
   CalendarPlusIcon,
   CalendarXIcon,
+  CircleCheckIcon,
   CirclePauseIcon,
   CirclePlayIcon,
   CrownIcon,
@@ -12,12 +13,14 @@ import {
   HouseIcon,
   Link2OffIcon,
   LinkIcon,
+  ListPlusIcon,
   LogOutIcon,
   NotebookTextIcon,
   PencilIcon,
   ReceiptIcon,
   RotateCcwIcon,
   SearchXIcon,
+  ShoppingBasketIcon,
   SkipForwardIcon,
   Trash2Icon,
   Undo2Icon,
@@ -75,6 +78,16 @@ const ICONS: Record<JournalEntryType, LucideIcon> = {
   bill_ended: CalendarXIcon,
   bill_skipped: SkipForwardIcon,
   bill_unskipped: Undo2Icon,
+  shopping_item_added: ShoppingBasketIcon,
+  shopping_item_updated: PencilIcon,
+  shopping_item_purchased: CircleCheckIcon,
+  shopping_item_reopened: Undo2Icon,
+  shopping_item_removed: Trash2Icon,
+  chore_created: ListPlusIcon,
+  chore_updated: PencilIcon,
+  chore_completed: CircleCheckIcon,
+  chore_reopened: Undo2Icon,
+  chore_removed: Trash2Icon,
 };
 
 /** Token pairs checked by tokens.test.ts; the category is also said in words. */
@@ -82,6 +95,8 @@ const TONES: Record<JournalCategory, string> = {
   expenses: "bg-info-subtle text-info",
   settlements: "bg-secondary text-secondary-foreground",
   bills: "bg-muted text-muted-foreground",
+  shopping: "bg-success-subtle text-success",
+  chores: "bg-accent text-accent-foreground",
   household: "bg-highlight-subtle text-highlight-foreground",
 };
 
@@ -100,11 +115,30 @@ const EMPTY: Record<JournalCategory, { title: string; description: string }> = {
     description:
       "When someone adds, changes, pauses or ends a bill, or skips a period, it will appear here. Recording a bill adds an expense.",
   },
+  shopping: {
+    title: "No shopping list activity yet",
+    description:
+      "When someone adds, changes, buys or removes an item on the shopping list, it will appear here.",
+  },
+  chores: {
+    title: "No chore activity yet",
+    description:
+      "When someone adds, changes, completes or removes a chore, it will appear here.",
+  },
   household: {
     title: "No household activity yet",
     description:
       "When someone joins, leaves or creates an invite link, it will appear here.",
   },
+};
+
+const UNAVAILABLE: Record<JournalCategory, string> = {
+  expenses: "This expense is no longer available.",
+  settlements: "This payment is no longer available.",
+  bills: "This bill is no longer available.",
+  shopping: "This item is no longer available.",
+  chores: "This chore is no longer available.",
+  household: "This is no longer available.",
 };
 
 /** Said at the end, when there's nothing older. */
@@ -113,6 +147,8 @@ const END: Record<JournalQuery["filter"], string> = {
   expenses: "That's all the expense activity.",
   settlements: "That's all the payment activity.",
   bills: "That's all the bill activity.",
+  shopping: "That's all the shopping list activity.",
+  chores: "That's all the chore activity.",
   household: "That's all the household activity.",
 };
 
@@ -353,13 +389,7 @@ function JournalItem({
           </ul>
         ) : null}
         {description.unavailable ? (
-          <p className="type-help">
-            {description.category === "expenses"
-              ? "This expense is no longer available."
-              : description.category === "bills"
-                ? "This bill is no longer available."
-                : "This payment is no longer available."}
-          </p>
+          <p className="type-help">{UNAVAILABLE[description.category]}</p>
         ) : null}
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 type-timestamp">
           <time dateTime={instant.toISOString()}>

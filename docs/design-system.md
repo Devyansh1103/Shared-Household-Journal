@@ -212,11 +212,33 @@ Every control has default, hover, `focus-visible` (solid 3px ring) and disabled 
   and the date ("Record Rent due 1 Dec 2026").
 - **The schedule** shows its next four due dates as it's chosen, by the database's own rules.
 
+**Shopping list and chores** (roadmap Phase 15; [shopping-chores.md](shopping-chores.md))
+
+- **Quick add.** The shopping list's form sits at the top of the list and stays there: after an
+  add it's empty again with a fresh request key, and says what was added (`FormAlert` `success`).
+- **One-tap actions** (`ActionButton`, [src/components/action-button.tsx](../src/components/action-button.tsx)):
+  "Mark bought", "Still needed", "Mark done", "Not done". No confirmation, since the opposite button
+  undoes them; a toast says what happened, and an error shows under the button. Removing an item or
+  a chore confirms with an `AlertDialog` ("Keep item" is the safe choice). Each button's accessible
+  name is its visible words, then the record: "Mark bought: Milk (2)" (WCAG 2.5.3).
+- **Filters are links** (`FilterChips`, [src/components/filter-chips.tsx](../src/components/filter-chips.tsx)),
+  as in the journal: Still needed / Bought / All, Anyone / Mine / Unassigned / each member, and for
+  chores To do / Done / All and a priority.
+- **Chores by when:** My tasks, Overdue, Due today, Upcoming, Any time, Done; each chore appears once,
+  in words with an icon (`StatusBadge`: Overdue danger, Due today warning, Upcoming neutral, Done
+  success). Priority is a word too: "High priority" (`warning`), "Medium priority", "Low priority"
+  (outline).
+- **Who's doing it** (`AssigneeField`, [src/components/assignee-field.tsx](../src/components/assignee-field.tsx)):
+  a native select with Nobody, the current members ("(you)" for the viewer), and a former
+  assignee marked "(left)" only while it's still theirs.
+- **Journal tints:** Shopping is `success`/`success-subtle`, Chores `accent-foreground`/`accent`,
+  both pairs `tokens.test.ts` checks.
+
 **Forms keep what was submitted.** React resets a form's fields after its action, even when the
 action comes back with errors. Text inputs come back from the submitted values, but a select goes
 back to its first default and a Radix checkbox to its first tick, silently: a changed payer or an
 unticked person would come back unnoticed. Forms that show errors (the expense form, the bill
-forms) number each answer and give their fields a `key` from it, so the fields start again from
+forms, and since roadmap Phase 15 the item and chore forms) number each answer and give their fields a `key` from it, so the fields start again from
 what was submitted, and selects stay **uncontrolled** (`defaultValue`): a controlled select has no
 default, so a reset would show its first option. Found in roadmap Phase 14; `e2e/bills.spec.ts`
 checks a payer, a category and a tick after an error.

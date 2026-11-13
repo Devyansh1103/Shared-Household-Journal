@@ -15,6 +15,7 @@ Records shared household expenses and home coordination. **The app never moves m
 - [docs/money.md](docs/money.md): money representation, ISO 4217 decimals, the split engine, rounding, balances (sign convention and invariants) and error codes
 - [docs/journal.md](docs/journal.md): the household journal: which events are shown and how, consistency and visibility, pages and privacy
 - [docs/bills.md](docs/bills.md): recurring bills: the schedule rules, periods without a scheduler, recording, the lifecycle, reminders (in-app only)
+- [docs/shopping-chores.md](docs/shopping-chores.md): the shared shopping list and one-off chores: fields, filters, who may do what (D28), people who leave, the journal
 
 ## Commands (npm only)
 

@@ -18,6 +18,7 @@ import {
   listMembers,
 } from "@/lib/households/queries";
 import { BillsReminder, BillsReminderSkeleton } from "./bills-reminder";
+import { ChoresSummary, ShoppingSummary, SummarySkeleton } from "./home-tasks";
 import { InvitePanel } from "./invite-panel";
 import { InvitationList } from "./invitation-list";
 import { MemberList } from "./member-list";
@@ -153,8 +154,28 @@ async function HouseholdContent({
       </Section>
 
       <Section
+        title="Shopping"
+        description="One shared list: what the household needs and who's getting it."
+      >
+        <Suspense
+          fallback={<SummarySkeleton label="Loading the shopping list" />}
+        >
+          <ShoppingSummary household={household} />
+        </Suspense>
+      </Section>
+
+      <Section
+        title="Chores"
+        description="What needs doing around the home, who's doing it and when it's due."
+      >
+        <Suspense fallback={<SummarySkeleton label="Loading chores" />}>
+          <ChoresSummary household={household} />
+        </Suspense>
+      </Section>
+
+      <Section
         title="Journal"
-        description="A shared record of what's happened here: expenses added or changed, payments recorded, and people joining or leaving."
+        description="A shared record of what's happened here: expenses added or changed, payments recorded, bills, the shopping list, chores, and people joining or leaving."
       >
         <div>
           <Button variant="outline" asChild>

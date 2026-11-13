@@ -54,6 +54,15 @@ const billDetail = {
   anchor_on: "2026-12-01",
   ends_on: null,
 };
+const ITEM = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+const shoppingDetail = { name: "Milk", quantity: "1 litre", assignee_id: PAT };
+const CHORE = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const choreDetail = {
+  title: "Take out the bins",
+  assignee_id: PAT,
+  due_on: "2026-11-14",
+  priority: "medium",
+};
 
 const DETAILS: Record<JournalEntryType, unknown> = {
   household_created: { name: "Flat 4B" },
@@ -83,6 +92,24 @@ const DETAILS: Record<JournalEntryType, unknown> = {
   bill_ended: { description: "Rent", ends_on: "2027-06-01" },
   bill_skipped: { description: "Rent", due_on: "2026-12-01" },
   bill_unskipped: { description: "Rent", due_on: "2026-12-01" },
+  shopping_item_added: shoppingDetail,
+  shopping_item_updated: {
+    before: shoppingDetail,
+    after: { ...shoppingDetail, quantity: "2 litres", assignee_id: null },
+    note_changed: true,
+  },
+  shopping_item_purchased: { name: "Milk", quantity: "1 litre" },
+  shopping_item_reopened: { name: "Milk", quantity: null },
+  shopping_item_removed: { name: "Milk", quantity: "1 litre" },
+  chore_created: choreDetail,
+  chore_updated: {
+    before: choreDetail,
+    after: { ...choreDetail, due_on: null, priority: "high" },
+    description_changed: false,
+  },
+  chore_completed: { title: "Take out the bins" },
+  chore_reopened: { title: "Take out the bins" },
+  chore_removed: { title: "Take out the bins" },
 };
 
 function entityFor(type: JournalEntryType) {
@@ -95,6 +122,12 @@ function entityFor(type: JournalEntryType) {
   }
   if (category === "bills") {
     return { available: true, id: BILL, state: "active" };
+  }
+  if (category === "shopping") {
+    return { available: true, id: ITEM, state: "purchased" };
+  }
+  if (category === "chores") {
+    return { available: true, id: CHORE, state: "completed" };
   }
   return null;
 }
@@ -236,6 +269,7 @@ describe("parseJournalPayload", () => {
   it("refuses unknown types, wrong shapes and impossible values", () => {
     const [created] = rowsOf(["expense_created"]);
     const bad: RawRow[] = [
+      { ...created, type: "budget_created" },
       { ...created, type: "chore_completed" },
       { ...created, type: "settlement_recorded" },
       { ...created, detail: { ...expenseDetail, amount_minor: "0" } },
@@ -281,7 +315,109 @@ describe("entryCategory", () => {
       ...Array(4).fill("expenses"),
       ...Array(2).fill("settlements"),
       ...Array(7).fill("bills"),
+      ...Array(5).fill("shopping"),
+      ...Array(5).fill("chores"),
     ]);
+  });
+});
+
+describe("shopping and chore entries (roadmap Phase 15)", () => {
+  it("reads them, without notes or descriptions", () => {
+    const page = parsed(
+      rowsOf(["shopping_item_updated", "chore_created", "chore_updated"]),
+    );
+    expect(page.entries.map((e) => e.detail)).toEqual([
+      {
+        type: "shopping_item_updated",
+        before: { name: "Milk", quantity: "1 litre", assigneeId: PAT },
+        after: { name: "Milk", quantity: "2 litres", assigneeId: null },
+        noteChanged: true,
+      },
+      {
+        type: "chore_created",
+        chore: {
+          title: "Take out the bins",
+          assigneeId: PAT,
+          dueOn: "2026-11-14",
+          priority: "medium",
+        },
+      },
+      {
+        type: "chore_updated",
+        before: {
+          title: "Take out the bins",
+          assigneeId: PAT,
+          dueOn: "2026-11-14",
+          priority: "medium",
+        },
+        after: {
+          title: "Take out the bins",
+          assigneeId: PAT,
+          dueOn: null,
+          priority: "high",
+        },
+        descriptionChanged: false,
+      },
+    ]);
+  });
+
+  it("refuses a note, a description or an unknown priority", () => {
+    const [added] = rowsOf(["shopping_item_added"]);
+    const [created] = rowsOf(["chore_created"]);
+    for (const row of [
+      { ...added, detail: { ...shoppingDetail, note: "Full fat" } },
+      { ...created, detail: { ...choreDetail, description: "Blue bin" } },
+      { ...created, detail: { ...choreDetail, priority: "urgent" } },
+      { ...created, detail: { ...choreDetail, due_on: "14/11/2026" } },
+    ]) {
+      expect(
+        parseJournalPayload(payload([row])),
+        JSON.stringify(row),
+      ).toBeNull();
+    }
+  });
+
+  it("accepts each state an item or a chore can be in, and only those", () => {
+    const [item] = rowsOf(["shopping_item_removed"]);
+    const [chore] = rowsOf(["chore_reopened"]);
+    const options = {
+      householdId: HOUSEHOLD,
+      filter: "all" as const,
+      before: null,
+      pageSize: 25,
+    };
+    for (const state of ["active", "purchased", "removed"]) {
+      expect(
+        checkJournal(
+          parsed([{ ...item, entity: { available: true, id: ITEM, state } }]),
+          options,
+        ),
+        state,
+      ).toEqual({ ok: true });
+    }
+    for (const state of ["active", "completed", "removed"]) {
+      expect(
+        checkJournal(
+          parsed([{ ...chore, entity: { available: true, id: CHORE, state } }]),
+          options,
+        ),
+        state,
+      ).toEqual({ ok: true });
+    }
+    for (const row of [
+      { ...item, entity: { available: true, id: ITEM, state: "completed" } },
+      { ...chore, entity: { available: true, id: CHORE, state: "purchased" } },
+      { ...chore, entity: { available: true, id: CHORE, state: "deleted" } },
+      { ...item, entity: null },
+    ]) {
+      expect(checkJournal(parsed([row]), options)).toEqual({
+        ok: false,
+        code: "entity_mismatch",
+      });
+    }
+    expect(
+      checkJournal(parsed([item]), { ...options, filter: "chores" }),
+    ).toEqual({ ok: false, code: "filter_mismatch" });
   });
 });
 
@@ -290,7 +426,8 @@ describe("checkJournal", () => {
     householdId: HOUSEHOLD,
     filter: "all" as const,
     before: null,
-    pageSize: 25,
+    // Room for one entry of every type.
+    pageSize: 50,
   };
 
   it("accepts a page in order, for every filter it matches", () => {

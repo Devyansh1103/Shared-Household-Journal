@@ -355,6 +355,46 @@ few small scans plus the date arithmetic.
 Tests: [supabase/tests/bills.test.ts](../supabase/tests/bills.test.ts) and the unit tests in
 [src/lib/bills/](../src/lib/bills/).
 
+## Shopping list and chores (roadmap Phase 15)
+
+Migrations `20261118120000_shopping_chore_types.sql` (the `chore_priority` enum and the journal's
+ten new event types and two entity types, in a file of their own) and
+`20261118120100_shopping_and_chores.sql`. What they are and the rules:
+[shopping-chores.md](shopping-chores.md).
+
+| Table            | Purpose                         | Key constraints                                                                                                                                                                                                                                                         |
+| ---------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shopping_items` | The household's one shared list | `name` 1–120 chars, `quantity` 1–40 and `note` 1–300, all trimmed; `assignee_id`, `added_by`; `purchased_at`/`purchased_by` together; `removed_at`/`removed_by` together; `creation_key` unique per creator. Partial indexes for what's still needed and what's bought. |
+| `chores`         | One-off chores (no recurrence)  | `title` 1–120 and `description` 1–1000, trimmed; `assignee_id`; `due_on` a `date` (D11) in 2000–2099; `priority` `low`/`medium`/`high` (default `medium`); `created_by`; `completed_at`/`completed_by` together; `removed_at`/`removed_by` together; `creation_key`.    |
+
+Every person column references `profiles` (`on delete restrict`, as everywhere); the household
+cascades (D14). Nothing is ever deleted otherwise: removal sets `removed_at`.
+
+Functions (`SECURITY DEFINER`, `search_path = ''`, `EXECUTE` for `authenticated` only; the caller
+from `auth.uid()`; each change journalled in the same transaction):
+
+| Function                                                                                                                                         | Who (D28, proposed)                                                         | What                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `add_shopping_item(target_household_id, item_name, item_quantity?, item_note?, item_assignee_id?, request_key?)`                                 | Any active member                                                           | A repeated `request_key` returns the first item (also concurrently). The assignee is an active member or nobody (`HJ030`).                         |
+| `update_shopping_item(target_item_id, item_name, item_quantity?, item_note?, item_assignee_id?, expected_updated_at?)`                           | Any active member                                                           | Replaces all four fields. `HJ029` if changed since loaded; a former member may stay assigned but not be chosen again. No event if nothing changed. |
+| `purchase_shopping_item`, `reopen_shopping_item`, `remove_shopping_item(target_item_id)`                                                         | Any active member                                                           | Under a row lock; already that way: nothing happens, no event. `HJ028` for a removed item (except removing it again).                              |
+| `create_chore(target_household_id, chore_title, chore_description?, chore_assignee_id?, chore_due_on?, chore_priority_level?, request_key?)`     | Any active member                                                           | As for items.                                                                                                                                      |
+| `update_chore(target_chore_id, chore_title, chore_description?, chore_assignee_id?, chore_due_on?, chore_priority_level?, expected_updated_at?)` | Who added it, its assignee, the owner (`42501` otherwise)                   | Also how it's reassigned. `HJ029`, `HJ030`, `HJ028` as for items.                                                                                  |
+| `complete_chore`, `reopen_chore(target_chore_id)`                                                                                                | The same, or anyone when it's assigned to nobody or to someone who has left | Already that way: nothing happens, no event.                                                                                                       |
+| `remove_chore(target_chore_id)`                                                                                                                  | Who added it, its assignee, the owner                                       | Already removed: nothing happens.                                                                                                                  |
+
+Ids of items or chores in another household get the same answer as ids that don't exist (`HJ026`,
+`HJ027`). Reads are plain selects under RLS (members of the household only); the app reads every
+item still needed (up to 500), the latest 100 bought, every open chore (up to 500) and the latest 50
+done. `household_journal` is replaced, same signature and grants, with `shopping` and `chores`
+filters and each item's (active, purchased, removed) or chore's (active, completed, removed) state.
+
+Error codes: `HJ026` no such item, `HJ027` no such chore, `HJ028` removed, `HJ029` changed since
+loaded, `HJ030` the assignee isn't an active member.
+
+Tests: [supabase/tests/shopping-chores.test.ts](../supabase/tests/shopping-chores.test.ts) and the
+unit tests in [src/lib/shopping/](../src/lib/shopping/) and [src/lib/chores/](../src/lib/chores/).
+
 ## Access control
 
 RLS is enabled on every table, with deny by default. Policies apply to `authenticated` only. `anon` has
@@ -381,6 +421,7 @@ Helpers live in the `private` schema, which the Data API does not expose. All ar
 | `settlements`                              | Active members (voided ones too, D9)                         | No (`record_settlement`)                                                    | No (`void_settlement`; the trigger refuses anything else)               | No     |
 | `recurring_bills`, `recurring_bill_shares` | Active members                                               | No (`create_recurring_bill`)                                                | No (the bill functions)                                                 | No     |
 | `bill_occurrences`                         | Active members                                               | No (the bill functions)                                                     | No (skip and un-skip only; the trigger refuses anything else)           | No     |
+| `shopping_items`, `chores`                 | Active members (removed ones too)                            | No (`add_shopping_item`, `create_chore`)                                    | No (the shopping and chore functions)                                   | No     |
 
 "No" means there is no policy **and** no table privilege, so the request fails with `42501`.
 Column-level grants stop an allowed row update from also changing ids, creators or counters.
