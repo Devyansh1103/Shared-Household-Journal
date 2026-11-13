@@ -28,6 +28,9 @@ describe("isActive", () => {
     expect(isActive(home, "/home/")).toBe(true);
     expect(isActive(profile, "/profile")).toBe(true);
     expect(isActive(home, "/profile")).toBe(false);
+    // Notification settings are under the profile (roadmap Phase 17).
+    expect(isActive(profile, "/profile/notifications")).toBe(true);
+    expect(isActive(profile, "/profilex")).toBe(false);
   });
 
   it("marks exactly one of Household, Expenses and Balances inside a household", () => {

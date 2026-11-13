@@ -19,6 +19,7 @@ export function ActionButton({
   ariaLabel,
   variant = "outline",
   icon,
+  broadcast,
 }: {
   action: (previous: FormState, formData: FormData) => Promise<FormState>;
   /** Hidden fields naming what it's about. The server re-checks all of them. */
@@ -29,12 +30,15 @@ export function ActionButton({
   ariaLabel?: string;
   variant?: React.ComponentProps<typeof Button>["variant"];
   icon?: React.ReactNode;
+  /** A window event sent after success, for parts of the page that follow it. */
+  broadcast?: string;
 }) {
   const [state, formAction] = useActionState(
     async (previous: FormState, formData: FormData) => {
       const result = await action(previous, formData);
-      if (result.status === "success" && result.message) {
-        toast.success(result.message);
+      if (result.status === "success") {
+        if (result.message) toast.success(result.message);
+        if (broadcast) window.dispatchEvent(new Event(broadcast));
       }
       return result;
     },

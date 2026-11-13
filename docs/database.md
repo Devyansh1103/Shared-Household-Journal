@@ -407,6 +407,19 @@ already a budget for that category and period; `HJ028` and `HJ029` reused. The r
 the functions and rolling back: [budgets.md](budgets.md#database). Tests:
 [supabase/tests/budgets.test.ts](../supabase/tests/budgets.test.ts).
 
+## Notifications (roadmap Phase 17)
+
+Migration `20261120120000_notifications.sql`: the `notification_category` type (the journal's
+categories), tables `notifications` and `notification_preferences`, the `activity_events_notify`
+trigger, which writes an event's notifications in its transaction to the people D30 names, and
+the functions `my_notifications`, `my_unread_notification_count`, `mark_notifications_read` and
+`set_notification_preferences`. The journal's projection moved into shared helpers
+(`private.journal_detail`, `journal_mentions`, `journal_entity`, `journal_category`), and
+`household_journal` was replaced, same signature, grants and output, built on them (its output
+for every event type and page was compared byte for byte before and after). The rules:
+[notifications.md](notifications.md#database). Tests:
+[supabase/tests/notifications.test.ts](../supabase/tests/notifications.test.ts).
+
 ## Access control
 
 RLS is enabled on every table, with deny by default. Policies apply to `authenticated` only. `anon` has
@@ -435,6 +448,8 @@ Helpers live in the `private` schema, which the Data API does not expose. All ar
 | `bill_occurrences`                         | Active members                                               | No (the bill functions)                                                     | No (skip and un-skip only; the trigger refuses anything else)           | No     |
 | `shopping_items`, `chores`                 | Active members (removed ones too)                            | No (`add_shopping_item`, `create_chore`)                                    | No (the shopping and chore functions)                                   | No     |
 | `budgets`, `budget_limits`                 | Active members (removed budgets too)                         | No (`create_budget`)                                                        | No (`update_budget`, `archive_budget`)                                  | No     |
+| `notifications`                            | Their recipient, while an active member of the household     | No (the `activity_events` trigger)                                          | No (`mark_notifications_read`)                                          | No     |
+| `notification_preferences`                 | Their owner, while an active member of the household         | No (`set_notification_preferences`)                                         | No (`set_notification_preferences`)                                     | No     |
 
 "No" means there is no policy **and** no table privilege, so the request fails with `42501`.
 Column-level grants stop an allowed row update from also changing ids, creators or counters.
@@ -448,7 +463,8 @@ Members who leave or are removed lose access immediately, because every check re
   member calling the Data API directly can still insert other values, as since Phase 4.
 - How a former member's balance is settled is still open (O9): new settlements need two active
   members.
-- D9's in-app notification to the other party arrives with notifications (Phase 17, D12); the
-  `settlement_recorded` event it will use is written now (and shown in the journal since Phase 13).
 - Nothing schedules anything (no cron, no job runner): bill periods don't need it (see above), and
-  notifications (Phase 17) will decide whether they do.
+  notifications don't either: they're written with their events, and what's due is worked out
+  when it's shown (D30).
+- Notification retention is undecided (O2): nothing deletes them but deleting the household or the
+  account.

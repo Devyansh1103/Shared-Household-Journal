@@ -251,11 +251,49 @@ Every control has default, hover, `focus-visible` (solid 3px ring) and disabled 
   person" figure.
 - **Journal tint:** Budgets is `warning`/`warning-subtle`, a pair `tokens.test.ts` checks.
 
+**Notifications** (roadmap Phase 17; [notifications.md](notifications.md))
+
+- **The bell** (`NotificationBell`, [src/components/shell/notification-bell.tsx](../src/components/shell/notification-bell.tsx))
+  sits at the end of the top bar below 1024px and beside the brand in the sidebar from 1024px. It's
+  an icon link (40px) named with the count, "Notifications, 3 unread"; the badge (white on
+  `destructive`, "99+" above 99) is `aria-hidden`. It has `aria-current` on the notification
+  centre. Both copies share one count (one request at a time).
+- **The notification centre:** Needs attention first (a `StatusBadge` and the item, as on the
+  Bills, Chores and Budgets pages), then All / Unread chips and the list. An unread one has a "New"
+  badge and a bar at its edge, never colour alone; its title is the button that opens it, with the
+  summary as its description. "Mark as read" uses `ActionButton` with `broadcast`, a window event
+  the bell listens for.
+- **Settings:** a card per household, a `FieldSet` with the household as its legend, and a tick
+  with a description per type. "Save" is named "Save for Flat 4B", so the forms are told apart, and
+  a long name can't push the button off a phone.
+- **Journal tint and wording:** a notification uses the journal's own words for its event
+  (`entryDescriber`), so the same thing never reads two ways.
+
+**The Phase 17 audit** (2026-11-13). Every page (33 signed in, 4 signed out, with real data in
+every module) at 320, 375, 390, 768, 1366 and 1920px, in Edge:
+
+- **axe with WCAG 2.0, 2.1 and 2.2 A and AA** (including 2.2's target size): no violations before
+  or after the phase's changes.
+- **Horizontal overflow:** one found and fixed. A long expense name in Analytics' "Largest expense"
+  widened the page by up to 209px at 320–390px: a grid item is at least as wide as its content, so
+  the cell needed `min-w-0` for `truncate` to work. The notification settings' button had the same
+  problem with a long household name (above).
+- **Keyboard** (in `e2e/notifications.spec.ts`): the skip link is the first stop and moves focus to
+  the content; then the brand and the bell, with a visible ring; a confirmation dialog puts focus on
+  its safe choice, closes with Escape and gives focus back to its button.
+- **Reduced motion:** checked in the browser with the setting on: transitions take no time.
+- **Conventions confirmed across the app**, so nothing was changed: optional fields say
+  "(optional)" in their label and every other field is needed; a submit button is disabled with a
+  spinner while it runs; success is said only after the server confirms (a toast, or a notice on
+  the page after a redirect); errors sit under their field and are linked to it; creating anything
+  uses a request key, so a second click can't make a second one.
+
 **Forms keep what was submitted.** React resets a form's fields after its action, even when the
 action comes back with errors. Text inputs come back from the submitted values, but a select goes
 back to its first default and a Radix checkbox to its first tick, silently: a changed payer or an
 unticked person would come back unnoticed. Forms that show errors (the expense form, the bill
-forms, and since roadmap Phase 15 the item and chore forms) number each answer and give their fields a `key` from it, so the fields start again from
+forms, since roadmap Phase 15 the item and chore forms, and since Phase 17 the notification
+settings) number each answer and give their fields a `key` from it, so the fields start again from
 what was submitted, and selects stay **uncontrolled** (`defaultValue`): a controlled select has no
 default, so a reset would show its first option. Found in roadmap Phase 14; `e2e/bills.spec.ts`
 checks a payer, a category and a tick after an error.
@@ -273,7 +311,10 @@ checks a payer, a category and a tick after an error.
 - Icon-only buttons have an `aria-label`. Decorative icons have `aria-hidden`.
 - Overlays come from Radix, which handles the focus trap, Escape to close, and returning focus to the trigger.
 - A visible outline is applied globally to links and custom focus targets.
-- `prefers-reduced-motion` shortens all animations and transitions.
+- `prefers-reduced-motion` shortens all animations and transitions (checked in a browser with the
+  setting on since roadmap Phase 17).
+- Target: WCAG 2.2 AA. axe's 2.2 rules (including target size) pass on every page; see the Phase 17
+  audit above.
 
 ## Verifying changes
 

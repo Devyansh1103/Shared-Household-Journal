@@ -61,7 +61,7 @@ export const ENTRY_CATEGORIES = {
 
 export type JournalEntryType = keyof typeof ENTRY_CATEGORIES;
 
-const ENTRY_TYPES = Object.keys(ENTRY_CATEGORIES) as [
+export const ENTRY_TYPES = Object.keys(ENTRY_CATEGORIES) as [
   JournalEntryType,
   ...JournalEntryType[],
 ];
@@ -211,7 +211,8 @@ const ENTITY_STATE_VALUES = [
   "archived",
 ] as const;
 
-const entitySchema = z
+/** The record an entry is about, as public.household_journal returns it. */
+export const entitySchema = z
   .union([
     z.strictObject({ available: z.literal(false) }),
     z.strictObject({
@@ -478,8 +479,11 @@ function choreFields(value: z.infer<typeof choreSchema>): ChoreFields {
   };
 }
 
-/** One entry's detail as typed values, or null if it isn't its type's shape. */
-function parseDetail(
+/**
+ * One entry's detail as typed values, or null if it isn't its type's shape.
+ * Shared with the notifications, which show the same projection.
+ */
+export function parseDetail(
   type: JournalEntryType,
   detail: unknown,
 ): JournalDetail | null {
@@ -676,7 +680,9 @@ export function parseJournalPayload(payload: unknown): JournalPage | null {
 }
 
 /** Which filter an entry belongs to. */
-export function entryCategory(entry: JournalEntry): JournalCategory {
+export function entryCategory(
+  entry: Pick<JournalEntry, "detail">,
+): JournalCategory {
   return ENTRY_CATEGORIES[entry.detail.type];
 }
 
@@ -734,7 +740,9 @@ const ENTITY_STATES: Record<
 };
 
 /** The record an entry may be about, and the states that record can be in. */
-function entityMatches(entry: JournalEntry): boolean {
+export function entityMatches(
+  entry: Pick<JournalEntry, "detail" | "entity">,
+): boolean {
   const category = entryCategory(entry);
   if (category === "household") return entry.entity === null;
   if (entry.entity === null) return false;

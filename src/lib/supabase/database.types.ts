@@ -583,6 +583,99 @@ export type Database = {
           },
         ];
       };
+      notification_preferences: {
+        Row: {
+          category: Database["public"]["Enums"]["notification_category"];
+          enabled: boolean;
+          household_id: string;
+          updated_at: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          category: Database["public"]["Enums"]["notification_category"];
+          enabled: boolean;
+          household_id: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          category?: Database["public"]["Enums"]["notification_category"];
+          enabled?: boolean;
+          household_id?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notifications: {
+        Row: {
+          activity_event_id: string;
+          category: Database["public"]["Enums"]["notification_category"];
+          created_at: string;
+          household_id: string;
+          id: string;
+          read_at: string | null;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          activity_event_id: string;
+          category: Database["public"]["Enums"]["notification_category"];
+          created_at: string;
+          household_id: string;
+          id?: string;
+          read_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          activity_event_id?: string;
+          category?: Database["public"]["Enums"]["notification_category"];
+          created_at?: string;
+          household_id?: string;
+          id?: string;
+          read_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_activity_event_id_fkey";
+            columns: ["activity_event_id"];
+            isOneToOne: false;
+            referencedRelation: "activity_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           avatar_url: string | null;
@@ -1083,6 +1176,24 @@ export type Database = {
         Args: { target_household_id: string };
         Returns: undefined;
       };
+      mark_notifications_read: {
+        Args: { target_notification_ids?: string[] };
+        Returns: number;
+      };
+      my_notifications: {
+        Args: {
+          before_id?: string;
+          before_us?: number;
+          page_size?: number;
+          target_notification_id?: string;
+          unread_only?: boolean;
+        };
+        Returns: Json;
+      };
+      my_unread_notification_count: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
       pause_recurring_bill: {
         Args: { target_bill_id: string };
         Returns: undefined;
@@ -1150,6 +1261,13 @@ export type Database = {
       };
       resume_recurring_bill: {
         Args: { target_bill_id: string };
+        Returns: undefined;
+      };
+      set_notification_preferences: {
+        Args: {
+          muted_categories?: Database["public"]["Enums"]["notification_category"][];
+          target_household_id: string;
+        };
         Returns: undefined;
       };
       skip_bill_occurrence: {
@@ -1287,6 +1405,14 @@ export type Database = {
         | "transport"
         | "other";
       household_role: "owner" | "member";
+      notification_category:
+        | "household"
+        | "expenses"
+        | "settlements"
+        | "bills"
+        | "shopping"
+        | "chores"
+        | "budgets";
       split_method: "equal" | "percentage" | "custom";
     };
     CompositeTypes: {
@@ -1475,6 +1601,15 @@ export const Constants = {
         "other",
       ],
       household_role: ["owner", "member"],
+      notification_category: [
+        "household",
+        "expenses",
+        "settlements",
+        "bills",
+        "shopping",
+        "chores",
+        "budgets",
+      ],
       split_method: ["equal", "percentage", "custom"],
     },
   },

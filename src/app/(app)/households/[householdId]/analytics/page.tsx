@@ -419,9 +419,11 @@ function Stat({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1 rounded-xl border border-border bg-card p-4">
+    // min-w-0: a grid item is otherwise at least as wide as its content, so
+    // a long expense name (truncated) pushed the page wider than a phone.
+    <div className="min-w-0 space-y-1 rounded-xl border border-border bg-card p-4">
       <dt className="type-label">{label}</dt>
-      <dd>{children}</dd>
+      <dd className="min-w-0">{children}</dd>
     </div>
   );
 }

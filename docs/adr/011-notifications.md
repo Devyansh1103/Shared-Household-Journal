@@ -26,4 +26,8 @@
 
 ## Repository evidence
 
-None in code (see [phase-0 audit](../audits/phase-0.md)). Sources: PRD §11, TRD §12.
+Implemented 2026-11-13 (roadmap Phase 17): `notifications` (one row per recipient and
+`activity_events` row) and `notification_preferences` (per person, household and type) in
+[20261120120000_notifications.sql](../../supabase/migrations/20261120120000_notifications.sql);
+who is notified is D30. In the app only: no email, push or real-time channel exists. See
+[notifications.md](../notifications.md). Sources: PRD §11, TRD §12.

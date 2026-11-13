@@ -1,5 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import Link from "next/link";
+import { BellIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { FormSkeleton } from "@/components/form-skeleton";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -26,6 +29,19 @@ export default function ProfilePage() {
       >
         <ProfileDetails />
       </Suspense>
+      <Section
+        title="Notifications"
+        description="Choose what you're notified about in each household. Notifications appear in the app only."
+      >
+        <div>
+          <Button variant="outline" asChild>
+            <Link href="/profile/notifications">
+              <BellIcon aria-hidden="true" data-icon="inline-start" />
+              Notification settings
+            </Link>
+          </Button>
+        </div>
+      </Section>
       <Section
         title="Sign out"
         description="Signs you out on this device only."

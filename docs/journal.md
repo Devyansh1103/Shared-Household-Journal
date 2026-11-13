@@ -191,8 +191,11 @@ Phase 18; it changes a security policy, so it needs the owner's approval.
 - No total count of entries: counting would scan the whole journal (with the same RLS cost) on every
   page.
 - No live updates: the page shows the journal as of loading it.
-- Comments, reactions, notifications, exports and summaries aren't part of the journal (Phase 17 adds
-  in-app notifications, which will read these events, D12).
+- Comments, reactions, exports and summaries aren't part of the journal. In-app notifications
+  (roadmap Phase 17, D12) are made from its events and show the journal's own words for them:
+  since then the projection lives in shared helpers (`private.journal_detail`,
+  `journal_mentions`, `journal_entity`), used by `household_journal` and `my_notifications`
+  alike ([notifications.md](notifications.md)).
 - Each phase adds its own event types to the allowlist on purpose: bills (roadmap Phase 14), the
   shopping list and chores (15), budgets (16). Analytics are a read and write no events.
 - Renaming a household isn't journalled; the app has no way to rename one.

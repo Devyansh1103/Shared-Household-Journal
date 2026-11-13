@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
-import { HouseIcon } from "lucide-react";
+import { BellIcon, HouseIcon } from "lucide-react";
+import { cn } from "cn";
 import { HouseholdSwitcher } from "@/components/shell/household-switcher";
 import { MainNav } from "@/components/shell/main-nav";
-import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/shell/notification-bell";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import {
@@ -29,8 +31,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Desktop sidebar */}
       <div className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-card lg:flex">
-        <div className="px-4 pt-5 pb-4">
+        <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-4">
           <BrandLink />
+          <Suspense fallback={<BellFallback />}>
+            <NotificationBell />
+          </Suspense>
         </div>
         <div className="px-3">
           <Suspense fallback={<Skeleton className="h-10 w-full" />}>
@@ -58,6 +63,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Switcher />
             </Suspense>
           </div>
+          <Suspense fallback={<BellFallback className="ml-auto" />}>
+            <NotificationBell className="ml-auto" />
+          </Suspense>
         </header>
 
         <main
@@ -149,6 +157,23 @@ function BrandLink({ compact = false }: { compact?: boolean }) {
       ) : (
         <span>Shared Household Journal</span>
       )}
+    </Link>
+  );
+}
+
+/** The bell before its count has loaded: the same link, without a number. */
+function BellFallback({ className }: { className?: string }) {
+  return (
+    <Link
+      href="/notifications"
+      aria-label="Notifications"
+      className={cn(
+        buttonVariants({ variant: "ghost", size: "icon" }),
+        "shrink-0",
+        className,
+      )}
+    >
+      <BellIcon aria-hidden="true" className="size-5" />
     </Link>
   );
 }

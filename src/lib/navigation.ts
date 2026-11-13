@@ -60,7 +60,8 @@ export function navItems(currentHouseholdId?: string | null): NavItem[] {
     key: "profile",
     href: "/profile",
     label: "Profile",
-    matchSubpaths: false,
+    // Notification settings live under the profile.
+    matchSubpaths: true,
   });
   return items;
 }
