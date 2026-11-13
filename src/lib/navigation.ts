@@ -12,8 +12,8 @@ export type NavItem = {
   matchSubpaths: boolean;
   /**
    * Other sections that belong to this item, active with their sub-paths:
-   * settlements are reached from Balances and the journal from Household,
-   * because the bottom bar has no room for a sixth tab at 360px.
+   * settlements are reached from Balances, and the journal and bills from
+   * Household, because the bottom bar has no room for a sixth tab at 360px.
    */
   alsoMatches?: string[];
 };
@@ -31,7 +31,7 @@ export function navItems(currentHouseholdId?: string | null): NavItem[] {
         href: base,
         label: "Household",
         matchSubpaths: false,
-        alsoMatches: [`${base}/journal`],
+        alsoMatches: [`${base}/journal`, `${base}/bills`],
       },
       {
         key: "expenses",

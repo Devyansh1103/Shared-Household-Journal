@@ -102,7 +102,7 @@ Built in Phase 3 (after Phase 6). Signed-in pages (`src/app/(app)/layout.tsx`) g
 | ≥ 1024px (`lg`) | Sticky 256px sidebar: logo, household switcher, main nav, and account (name → Profile, Sign out) at the foot.                  |
 | < 1024px        | Sticky top bar (logo, household switcher) and a fixed bottom tab bar with icon + text labels. Sign out is on the Profile page. |
 
-- **Main nav** ([src/lib/navigation.ts](../src/lib/navigation.ts), unit-tested): Home; then Household, Expenses and Balances (only inside one of your households); then Profile. Only routes that exist are listed (D23); each feature phase adds its entry with its pages. The bottom bar fits five labelled tabs at 360px (checked in `e2e/balances.spec.ts`), so settlements (roadmap Phase 10) have no tab of their own: Balances stays active on `/settlements` pages (`alsoMatches`). The same goes for the journal (roadmap Phase 13), under Household, which links to it.
+- **Main nav** ([src/lib/navigation.ts](../src/lib/navigation.ts), unit-tested): Home; then Household, Expenses and Balances (only inside one of your households); then Profile. Only routes that exist are listed (D23); each feature phase adds its entry with its pages. The bottom bar fits five labelled tabs at 360px (checked in `e2e/balances.spec.ts`), so settlements (roadmap Phase 10) have no tab of their own: Balances stays active on `/settlements` pages (`alsoMatches`). The same goes for the journal (roadmap Phase 13) and bills (roadmap Phase 14), under Household, which links to both.
 - **Active item:** `aria-current="page"`, a heavier weight and an indicator bar, so it never relies on colour alone.
 - **Household switcher** ([src/components/shell/household-switcher.tsx](../src/components/shell/household-switcher.tsx)): the current household is read from the URL (`/households/[householdId]`) and is shown only if it's one of yours. Switching is plain navigation, so each page loads its own data on the server. Nothing is stored in the browser.
 - **Fresh after changes:** actions that change your list of households (create, join, leave, delete) call `revalidatePath("/", "layout")` before redirecting.
@@ -199,6 +199,27 @@ Every control has default, hover, `focus-visible` (solid 3px ring) and disabled 
   content: Next.js scrolls to a fragment when the navigation commits, before a Suspense boundary has
   rendered the target (caught by `e2e/journal.spec.ts` on a phone). The target `section` gets
   `scroll-mt-20` so the sticky top bar doesn't cover its heading.
+
+**Bills** (roadmap Phase 14; [bills.md](bills.md))
+
+- **Grouped by when:** Overdue, Due today, Due in the next 7 days, Coming up, Paid recently, Paused,
+  Ended; a group only appears when it has something. Each row says it in words with an icon
+  (`StatusBadge`: Overdue is danger, Due today warning, Due soon info, Upcoming neutral, Paid
+  success), with the due date in words ("3 days overdue") and as a date.
+- **"Expected"** labels a bill's amount; an actual amount appears only on a recorded period, with a
+  link to its expense. "Paid on time" or "Paid late" compares the expense's date with the due date.
+- **Recording** is the expense form, pre-filled; the record link's accessible name names the bill
+  and the date ("Record Rent due 1 Dec 2026").
+- **The schedule** shows its next four due dates as it's chosen, by the database's own rules.
+
+**Forms keep what was submitted.** React resets a form's fields after its action, even when the
+action comes back with errors. Text inputs come back from the submitted values, but a select goes
+back to its first default and a Radix checkbox to its first tick, silently: a changed payer or an
+unticked person would come back unnoticed. Forms that show errors (the expense form, the bill
+forms) number each answer and give their fields a `key` from it, so the fields start again from
+what was submitted, and selects stay **uncontrolled** (`defaultValue`): a controlled select has no
+default, so a reset would show its first option. Found in roadmap Phase 14; `e2e/bills.spec.ts`
+checks a payer, a category and a tick after an error.
 
 **Destructive actions**
 

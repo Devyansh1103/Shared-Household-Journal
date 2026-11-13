@@ -24,6 +24,16 @@ describe("householdErrorMessage", () => {
     expect(householdErrorMessage("HJ012")).toMatch(/recorded payments/);
   });
 
+  it("explains every recurring bill code in plain words (roadmap Phase 14)", () => {
+    for (let n = 18; n <= 25; n++) {
+      const code = `HJ0${n}`;
+      const message = householdErrorMessage(code);
+      expect(message, code).not.toBe(GENERIC_ERROR);
+      expect(message, code).toMatch(/bill|period/);
+      expect(message, code).not.toMatch(/HJ0|occurrence|sqlstate/i);
+    }
+  });
+
   it("falls back to a generic message for unknown or missing codes", () => {
     expect(householdErrorMessage("XX999")).toBe(GENERIC_ERROR);
     expect(householdErrorMessage(undefined)).toBe(GENERIC_ERROR);

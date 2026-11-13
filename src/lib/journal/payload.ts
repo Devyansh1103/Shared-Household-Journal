@@ -37,6 +37,13 @@ export const ENTRY_CATEGORIES = {
   expense_restored: "expenses",
   settlement_recorded: "settlements",
   settlement_voided: "settlements",
+  bill_created: "bills",
+  bill_updated: "bills",
+  bill_paused: "bills",
+  bill_resumed: "bills",
+  bill_ended: "bills",
+  bill_skipped: "bills",
+  bill_unskipped: "bills",
 } as const satisfies Record<EventType, JournalCategory>;
 
 export type JournalEntryType = keyof typeof ENTRY_CATEGORIES;
@@ -83,6 +90,21 @@ const settlementSchema = z.strictObject({
   settled_on: z.iso.date(),
   recorded_by: id,
 });
+const billSchema = z.strictObject({
+  description: z.string(),
+  amount_minor: amount,
+  category: z.enum(CATEGORY_VALUES),
+  payer_id: id,
+  frequency: z.enum(["week", "month", "year"]),
+  interval_count: z.number().int().min(1).max(52),
+  anchor_on: z.iso.date(),
+  ends_on: z.iso.date().nullable(),
+});
+const billNameSchema = z.strictObject({ description: z.string() });
+const billPeriodSchema = z.strictObject({
+  description: z.string(),
+  due_on: z.iso.date(),
+});
 
 const detailSchemas = {
   household_created: z.strictObject({ name: z.string() }),
@@ -102,6 +124,16 @@ const detailSchemas = {
   expense_restored: expenseSchema,
   settlement_recorded: settlementSchema,
   settlement_voided: settlementSchema,
+  bill_created: billSchema,
+  bill_updated: z.strictObject({ before: billSchema, after: billSchema }),
+  bill_paused: billNameSchema,
+  bill_resumed: billNameSchema,
+  bill_ended: z.strictObject({
+    description: z.string(),
+    ends_on: z.iso.date(),
+  }),
+  bill_skipped: billPeriodSchema,
+  bill_unskipped: billPeriodSchema,
 } satisfies Record<JournalEntryType, z.ZodType>;
 
 const entitySchema = z
@@ -110,7 +142,7 @@ const entitySchema = z
     z.strictObject({
       available: z.literal(true),
       id,
-      state: z.enum(["active", "deleted", "voided"]),
+      state: z.enum(["active", "deleted", "voided", "paused", "ended"]),
     }),
   ])
   .nullable();
@@ -182,15 +214,41 @@ export type JournalDetail =
   | {
       type: "settlement_recorded" | "settlement_voided";
       settlement: SettlementFields;
+    }
+  | { type: "bill_created"; bill: BillFields }
+  | { type: "bill_updated"; before: BillFields; after: BillFields }
+  | { type: "bill_paused" | "bill_resumed"; description: string }
+  | { type: "bill_ended"; description: string; endsOn: string }
+  | {
+      type: "bill_skipped" | "bill_unskipped";
+      description: string;
+      dueOn: string;
     };
 
+export type BillFields = {
+  description: string;
+  amountMinor: bigint;
+  category: ExpenseCategory;
+  payerId: string;
+  frequency: "week" | "month" | "year";
+  every: number;
+  /** When the (current) schedule starts. */
+  anchorOn: string;
+  endsOn: string | null;
+};
+
 /**
- * The expense or payment an entry is about, as it is now: null for other
- * entries; unavailable if it isn't in this household (nothing to link to).
+ * The expense, payment or bill an entry is about, as it is now: null for
+ * other entries; unavailable if it isn't in this household (nothing to link
+ * to).
  */
 export type JournalEntity =
   | { available: false }
-  | { available: true; id: string; state: "active" | "deleted" | "voided" };
+  | {
+      available: true;
+      id: string;
+      state: "active" | "deleted" | "voided" | "paused" | "ended";
+    };
 
 export type JournalEntry = {
   id: string;
@@ -251,6 +309,19 @@ function settlementFields(
   };
 }
 
+function billFields(value: z.infer<typeof billSchema>): BillFields {
+  return {
+    description: value.description,
+    amountMinor: value.amount_minor,
+    category: value.category,
+    payerId: value.payer_id,
+    frequency: value.frequency,
+    every: value.interval_count,
+    anchorOn: value.anchor_on,
+    endsOn: value.ends_on,
+  };
+}
+
 /** One entry's detail as typed values, or null if it isn't its type's shape. */
 function parseDetail(
   type: JournalEntryType,
@@ -307,6 +378,38 @@ function parseDetail(
     case "settlement_voided": {
       const d = detailSchemas[type].safeParse(detail);
       return d.success ? { type, settlement: settlementFields(d.data) } : null;
+    }
+    case "bill_created": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success ? { type, bill: billFields(d.data) } : null;
+    }
+    case "bill_updated": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success
+        ? {
+            type,
+            before: billFields(d.data.before),
+            after: billFields(d.data.after),
+          }
+        : null;
+    }
+    case "bill_paused":
+    case "bill_resumed": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success ? { type, description: d.data.description } : null;
+    }
+    case "bill_ended": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success
+        ? { type, description: d.data.description, endsOn: d.data.ends_on }
+        : null;
+    }
+    case "bill_skipped":
+    case "bill_unskipped": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success
+        ? { type, description: d.data.description, dueOn: d.data.due_on }
+        : null;
     }
   }
 }
@@ -384,15 +487,23 @@ function fail(code: JournalCheckCode): JournalCheck {
   return { ok: false, code };
 }
 
+/** The states each kind of record can be in. */
+const ENTITY_STATES: Record<
+  Exclude<JournalCategory, "household">,
+  readonly string[]
+> = {
+  expenses: ["active", "deleted"],
+  settlements: ["active", "voided"],
+  bills: ["active", "paused", "ended"],
+};
+
 /** The record an entry may be about, and the states that record can be in. */
 function entityMatches(entry: JournalEntry): boolean {
   const category = entryCategory(entry);
   if (category === "household") return entry.entity === null;
   if (entry.entity === null) return false;
   if (!entry.entity.available) return true;
-  return category === "expenses"
-    ? entry.entity.state !== "voided"
-    : entry.entity.state !== "deleted";
+  return ENTITY_STATES[category].includes(entry.entity.state);
 }
 
 /**

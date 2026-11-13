@@ -7,11 +7,13 @@
 // targets.
 
 import type { Subject } from "@/lib/balances/explain";
+import { scheduleLabel } from "@/lib/bills/schedule";
 import { categoryLabel } from "@/lib/expenses/categories";
 import { formatDate, formatMoney } from "@/lib/format";
 import { paymentTitle, recordedSentence } from "@/lib/settlements/wording";
 import {
   entryCategory,
+  type BillFields,
   type ExpenseChangeFields,
   type JournalEntity,
   type JournalEntry,
@@ -68,6 +70,7 @@ export type DescribeContext = {
 const CATEGORY_LABELS: Record<JournalCategory, string> = {
   expenses: "Expense",
   settlements: "Payment",
+  bills: "Bill",
   household: "Household",
 };
 
@@ -172,6 +175,67 @@ export function entryDescriber(
       label,
       accessibleLabel: `${label}: ${about}`,
     };
+  }
+
+  function billLink(
+    entity: JournalEntity | null,
+    description: string,
+  ): EntryLink | null {
+    if (!entity?.available) return null;
+    return {
+      href: `${base}/bills/${entity.id}`,
+      label: "View bill",
+      accessibleLabel: `View bill: ${description}`,
+    };
+  }
+
+  const schedule = (bill: BillFields) =>
+    `${scheduleLabel(bill.frequency, bill.every)}, from ${formatDate(bill.anchorOn)}`;
+
+  /** What a change to a bill changed, old and new. */
+  function billChanges(before: BillFields, after: BillFields): EntryChange[] {
+    const changes: EntryChange[] = [];
+    const value = (label: string, from: string, to: string) =>
+      changes.push({ kind: "value", label, from, to });
+    if (before.description !== after.description) {
+      value("Name", `“${before.description}”`, `“${after.description}”`);
+    }
+    if (before.amountMinor !== after.amountMinor) {
+      value(
+        "Expected amount",
+        money(before.amountMinor),
+        money(after.amountMinor),
+      );
+    }
+    if (before.category !== after.category) {
+      value(
+        "Category",
+        categoryLabel(before.category),
+        categoryLabel(after.category),
+      );
+    }
+    if (before.payerId !== after.payerId) {
+      value(
+        "Usually paid by",
+        mention(subject(before.payerId)),
+        mention(subject(after.payerId)),
+      );
+    }
+    if (
+      before.frequency !== after.frequency ||
+      before.every !== after.every ||
+      before.anchorOn !== after.anchorOn
+    ) {
+      value("Schedule", schedule(before), schedule(after));
+    }
+    if (before.endsOn !== after.endsOn) {
+      value(
+        "Last due date",
+        before.endsOn ? formatDate(before.endsOn) : "none",
+        after.endsOn ? formatDate(after.endsOn) : "none",
+      );
+    }
+    return changes;
   }
 
   /** D6: what an edit changed, field by field, in the order the form asks. */
@@ -361,6 +425,48 @@ export function entryDescriber(
           result.context.push("It no longer counts towards balances");
         }
         result.link = paymentLink(entry.entity, about);
+        break;
+      }
+      case "bill_created": {
+        const { bill } = detail;
+        result.title = `${lead(actor)} added a bill`;
+        result.summary = `${bill.description} — ${money(bill.amountMinor)} expected`;
+        result.context.push(schedule(bill));
+        result.link = billLink(entry.entity, bill.description);
+        break;
+      }
+      case "bill_updated": {
+        const { after } = detail;
+        result.title = `${lead(actor)} changed a bill`;
+        result.summary = `${after.description} — ${money(after.amountMinor)} expected`;
+        result.changes = billChanges(detail.before, after);
+        result.link = billLink(entry.entity, after.description);
+        break;
+      }
+      case "bill_paused":
+      case "bill_resumed": {
+        result.title = `${lead(actor)} ${detail.type === "bill_paused" ? "paused" : "resumed"} a bill`;
+        result.summary = detail.description;
+        result.link = billLink(entry.entity, detail.description);
+        break;
+      }
+      case "bill_ended":
+        result.title = `${lead(actor)} ended a bill`;
+        result.summary = detail.description;
+        result.context.push(`Last due date ${formatDate(detail.endsOn)}`);
+        result.link = billLink(entry.entity, detail.description);
+        break;
+      case "bill_skipped":
+      case "bill_unskipped": {
+        result.title =
+          detail.type === "bill_skipped"
+            ? `${lead(actor)} skipped a bill period`
+            : `${lead(actor)} undid skipping a bill period`;
+        result.summary = `${detail.description}, due ${formatDate(detail.dueOn)}`;
+        if (detail.type === "bill_skipped") {
+          result.context.push("Nothing was recorded for it");
+        }
+        result.link = billLink(entry.entity, detail.description);
         break;
       }
     }

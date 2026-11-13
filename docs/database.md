@@ -272,7 +272,7 @@ caller is an active member, and RLS applies as well. One answer, one snapshot:
 - **Rows:** one page (default 25, at most 100) of the household's events, newest first by
   `(created_at, id)`, strictly older than the cursor (`before_us`, microseconds since the epoch, and
   `before_id`), optionally only `expenses`, `settlements` or `household` events. Only an allowlist of
-  the 13 existing types; invite links revoked in the same transaction as their creator leaving or
+  the existing types (13 in Phase 13, 20 with the bill events of Phase 14); invite links revoked in the same transaction as their creator leaving or
   being removed are left out (they stay stored).
 - **Each row:** its id, household, type, actor, `created_us` (exact, as text) and only the fields its
   entry shows, from the stored summary: no settlement notes, split shares, invite settings or raw
@@ -303,6 +303,58 @@ event write stops the operation and a rollback removes both; order against Postg
 every size, filters, cursors; access; privacy; no money changes) and the unit tests in
 [src/lib/journal/](../src/lib/journal/).
 
+## Recurring bills (roadmap Phase 14)
+
+Migrations `20261117120000_recurring_bill_types.sql` (the `bill_frequency` enum and the journal's
+new event types, in a file of their own because a new enum value can't be used in the transaction
+that adds it) and `20261117120100_recurring_bills.sql`. What bills are and the rules: [bills.md](bills.md).
+
+| Table / column                                    | Purpose                               | Key constraints                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `recurring_bills`                                 | A bill's definition (a reminder, D10) | `description` 1–120 chars and `notes` 1–500, trimmed; `amount_minor` 1 – 999,999,999,999 (expected); `frequency` `week`/`month`/`year`, `interval_count` 1–52; `anchor_on` (the schedule's first due date) and `next_index` (periods before it are stored); `ends_on`; `paused_at`/`paused_by` together; `creation_key` unique per creator. |
+| `recurring_bill_shares`                           | Its default split                     | Primary key (`bill_id`, `user_id`); composite key to the bill with the household; `percentage_bp` 0–10000 for percentage splits, `share_minor ≥ 0` for custom ones, neither for equal ones. Percentages total 10000 and custom amounts the expected amount (checked by the functions).                                                      |
+| `bill_occurrences`                                | A stored period                       | `unique (bill_id, due_on)`; composite key to the bill with the household; `expected_amount_minor` as it was when stored; `skipped_at`/`skipped_by` together. `bill_occurrences_protect` refuses every other change and every delete, for every role, except the cascade from deleting the household (D14).                                  |
+| `expenses.recurring_bill_id`, `recurrence_period` | The period an expense records (D10)   | Both or neither; foreign key `(recurring_bill_id, recurrence_period, household_id)` → the stored period, so only a real period of a bill in the same household; unique `(recurring_bill_id, recurrence_period)` for expenses that aren't deleted (D7). Set only by `record_bill_payment`.                                                   |
+
+**No scheduler.** The reads work out each bill's periods from its schedule every time (in the
+household's timezone, D11): the ones that have come and aren't stored are open, the next one after
+today is upcoming. Periods are stored only inside the action that needs them (record, skip, and
+before a pause, an end or a change, every period that has come), under the bill's row lock.
+
+Functions (`SECURITY DEFINER`, `search_path = ''`, `EXECUTE` for `authenticated` only; the caller
+from `auth.uid()`; each change journalled):
+
+| Function                                                                                                                                                                              | Who (D27, proposed)                   | What                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_recurring_bill(target_household_id, title, amount, bill_category, bill_payer_id, method, shares, repeat_unit, repeat_every, first_due_on, last_due_on?, memo?, request_key?)` | Any active member                     | First due date within the past year and the next ten; payer and split people active members (`HJ007`); a valid split (`HJ008`). A repeated `request_key` returns the first bill. |
+| `update_recurring_bill(target_bill_id, title, amount, bill_category, bill_payer_id, method, shares, last_due_on?, memo?, expected_updated_at?)`                                       | Who added it, who usually pays, owner | Stores the periods that have come first. Not the schedule. `HJ020` if changed since loaded; `HJ019` for an end before a stored period.                                           |
+| `reschedule_recurring_bill(target_bill_id, repeat_unit, repeat_every, next_due_on, expected_updated_at?)`                                                                             | Same                                  | A new schedule from `next_due_on`: today or later, after every stored period, not after the end date (`HJ019`).                                                                  |
+| `pause_recurring_bill`, `resume_recurring_bill`, `end_recurring_bill(target_bill_id)`                                                                                                 | Same                                  | `HJ021` for a bill already paused or ended / not paused / already ended. Resume moves the cursor to the first period from today.                                                 |
+| `skip_bill_occurrence`, `unskip_bill_occurrence(target_bill_id, occurrence_due_on)`                                                                                                   | Same                                  | A period that has come or the next one (`HJ024` otherwise); not recorded (`HJ022`); `HJ023` for the wrong skip state.                                                            |
+| `record_bill_payment(target_bill_id, occurrence_due_on, title, amount, expense_category, spent_on, payer_id, method, shares, request_key?)`                                           | Any active member                     | Stores the period, calls `create_expense`, links the expense, in one transaction. `HJ022` already recorded, `HJ023` skipped, `HJ024` not a period that can be recorded.          |
+| `restore_expense(target_expense_id)`                                                                                                                                                  | Replaced; same signature and grants   | Also `HJ025` when the expense's period was recorded again or skipped since it was deleted.                                                                                       |
+
+Reads (`security invoker`, `stable`, one snapshot; money as text): `household_bills(target_household_id)`
+(`42501` for non-members) returns today, the bills with their next due date, the open periods, and
+the periods paid in the last 30 days; `recurring_bill(target_bill_id)` (`HJ018` for a bill the caller
+can't see) returns one bill, its default split and its periods newest first (the next one, the open
+ones, and the newest 200 stored). The app checks both before showing them
+([payload.ts](../src/lib/bills/payload.ts)). `household_journal` is replaced, same signature and
+grants, with the bill events under a `bills` filter.
+
+Error codes: `HJ018` no such bill, `HJ019` the schedule isn't valid, `HJ020` changed since loaded,
+`HJ021` paused/ended state, `HJ022` period already recorded, `HJ023` skip state, `HJ024` not a
+period that can be recorded or skipped, `HJ025` can't restore over a period recorded again or
+skipped.
+
+**Indexes:** bills by household, payer, creator and pauser; periods by `(household_id, due_on)` and
+skipper; the unique `(bill_id, due_on)`; expenses by `(recurring_bill_id, recurrence_period)` (the
+unique one for counted expenses, and one for all). A household has a handful of bills, so a read is a
+few small scans plus the date arithmetic.
+
+Tests: [supabase/tests/bills.test.ts](../supabase/tests/bills.test.ts) and the unit tests in
+[src/lib/bills/](../src/lib/bills/).
+
 ## Access control
 
 RLS is enabled on every table, with deny by default. Policies apply to `authenticated` only. `anon` has
@@ -317,16 +369,18 @@ Helpers live in the `private` schema, which the Data API does not expose. All ar
 - `private.shares_household_with(user_id)`: the user has (or had) a membership in a household where
   the caller is active. Used by `profiles`.
 
-| Table               | Select                                                       | Insert                                                                      | Update                                                                  | Delete |
-| ------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------ |
-| `profiles`          | Self, and anyone who shares (or shared) a household with you | Trigger only                                                                | Self; `display_name`, `avatar_url` only                                 | No     |
-| `households`        | Active members                                               | No (`create_household`)                                                     | Owner; `name`, `currency_code`, `timezone` only                         | No     |
-| `household_members` | Active members of that household (all rows, incl. left)      | No (functions only)                                                         | No                                                                      | No     |
-| `activity_events`   | Active members                                               | No (functions and triggers only)                                            | No                                                                      | No     |
-| `invitations`       | Active members                                               | Active members; `household_id`, `token_hash`, `expires_at`, `max_uses` only | Set `revoked_at` on an unrevoked invite: its creator, or the owner (D4) | No     |
-| `expenses`          | Active members (deleted ones too, D7)                        | No (`create_expense`)                                                       | No (`update_expense`, `delete_expense`, `restore_expense`)              | No     |
-| `expense_splits`    | Active members                                               | No (functions only)                                                         | No                                                                      | No     |
-| `settlements`       | Active members (voided ones too, D9)                         | No (`record_settlement`)                                                    | No (`void_settlement`; the trigger refuses anything else)               | No     |
+| Table                                      | Select                                                       | Insert                                                                      | Update                                                                  | Delete |
+| ------------------------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------ |
+| `profiles`                                 | Self, and anyone who shares (or shared) a household with you | Trigger only                                                                | Self; `display_name`, `avatar_url` only                                 | No     |
+| `households`                               | Active members                                               | No (`create_household`)                                                     | Owner; `name`, `currency_code`, `timezone` only                         | No     |
+| `household_members`                        | Active members of that household (all rows, incl. left)      | No (functions only)                                                         | No                                                                      | No     |
+| `activity_events`                          | Active members                                               | No (functions and triggers only)                                            | No                                                                      | No     |
+| `invitations`                              | Active members                                               | Active members; `household_id`, `token_hash`, `expires_at`, `max_uses` only | Set `revoked_at` on an unrevoked invite: its creator, or the owner (D4) | No     |
+| `expenses`                                 | Active members (deleted ones too, D7)                        | No (`create_expense`)                                                       | No (`update_expense`, `delete_expense`, `restore_expense`)              | No     |
+| `expense_splits`                           | Active members                                               | No (functions only)                                                         | No                                                                      | No     |
+| `settlements`                              | Active members (voided ones too, D9)                         | No (`record_settlement`)                                                    | No (`void_settlement`; the trigger refuses anything else)               | No     |
+| `recurring_bills`, `recurring_bill_shares` | Active members                                               | No (`create_recurring_bill`)                                                | No (the bill functions)                                                 | No     |
+| `bill_occurrences`                         | Active members                                               | No (the bill functions)                                                     | No (skip and un-skip only; the trigger refuses anything else)           | No     |
 
 "No" means there is no policy **and** no table privilege, so the request fails with `42501`.
 Column-level grants stop an allowed row update from also changing ids, creators or counters.
@@ -342,5 +396,5 @@ Members who leave or are removed lose access immediately, because every check re
   members.
 - D9's in-app notification to the other party arrives with notifications (Phase 17, D12); the
   `settlement_recorded` event it will use is written now (and shown in the journal since Phase 13).
-- `expenses.recurring_bill_id` / `recurrence_period` and their unique key arrive with recurring
-  bills (Phase 14).
+- Nothing schedules anything (no cron, no job runner): bill periods don't need it (see above), and
+  notifications (Phase 17) will decide whether they do.

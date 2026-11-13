@@ -51,7 +51,7 @@ export function MemberList({
               <div className="flex flex-wrap gap-2">
                 <ConfirmActionDialog
                   triggerLabel="Make owner"
-                  triggerAriaLabel={`Make ${member.displayName} the owner`}
+                  triggerAriaLabel={`Make owner: ${member.displayName}`}
                   title={`Make ${member.displayName} the owner?`}
                   description={`${member.displayName} becomes the owner and you become a member. Only the owner can remove people, revoke other members' invite links and delete the household. Only ${member.displayName} could hand ownership back.`}
                   confirmLabel="Make owner"

@@ -15,6 +15,7 @@ export const JOURNAL_FILTERS = [
   "all",
   "expenses",
   "settlements",
+  "bills",
   "household",
 ] as const;
 export type JournalFilter = (typeof JOURNAL_FILTERS)[number];
@@ -25,6 +26,7 @@ export const FILTER_LABELS: Record<JournalFilter, string> = {
   all: "All activity",
   expenses: "Expenses",
   settlements: "Settlements",
+  bills: "Bills",
   household: "Household",
 };
 

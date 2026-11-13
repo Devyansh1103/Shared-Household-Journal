@@ -35,6 +35,7 @@ All Confirmed entries below were approved by the project owner on **2026-11-02**
 | D24 | An expense that involves someone who has left can still be deleted (D6, D7), but it can't be edited, and, as before, it can't be restored. Deleting one can leave a former member with a balance; balances show it with "(left)", and everyone's balances still add up to zero. Settling it is O9. Confirmed 2026-11-10.                                                                                                                                                                                                                                             | Confirmed | Phase 9   | [005](adr/005-derived-balances.md)                                       |
 | D25 | In the expense history, "This week" runs **Monday to Sunday** (ISO 8601) in the household's timezone (D11). Nothing approved said which day a week starts; CLDR's `en-IN` data says Sunday. One constant, `WEEK_STARTS_ON` in `src/lib/expenses/history.ts`. Stated as a roadmap Phase 12 default on 2026-11-13; awaiting approval. Since roadmap Phase 13 the journal's "Earlier this week" uses the same constant.                                                                                                                                                 | Proposed  | Phase 12  | —                                                                        |
 | D26 | The household journal shows every journalled change to every active member, including what happened before they joined (as with every other household record); former members see none of it. It names who did what and when, with amounts, but doesn't repeat payment notes, split shares or invite-link settings, which stay on their own pages. Invite links revoked automatically when their creator leaves or is removed are part of that entry, not entries of their own. Details below. Stated as roadmap Phase 13 defaults on 2026-11-13; awaiting approval. | Proposed  | Phase 13  | —                                                                        |
+| D27 | Recurring bills: any member adds a bill or records a period; the person who added it, the person who usually pays it or the owner changes, pauses, resumes or ends it and skips a period (D6's rule for expenses). A period can be skipped (no expense, not paid) and the skip undone. While a bill is paused no new period comes, and on resuming the periods that fell meanwhile don't come back. "Due soon" is 7 days. Details below. Stated as roadmap Phase 14 defaults on 2026-11-13; awaiting approval.                                                       | Proposed  | Phase 14  | [010](adr/010-recurring-bills.md)                                        |
 | F1  | Typeface: **Plus Jakarta Sans**, loaded with `next/font`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Confirmed | Phase 2   | —                                                                        |
 
 ## Architecture decisions
@@ -116,6 +117,41 @@ How roadmap Phase 13 implements it ([journal.md](journal.md)):
 - **No duplicates:** `unique(recurring_bill_id, recurrence_period)` on expenses.
 - **Edits:** apply to future periods only. Expenses already recorded are not changed.
 - **Disabling:** stops future reminders.
+
+How roadmap Phase 14 (2026-11-13) implements it ([bills.md](bills.md)):
+
+- **Patterns:** weekly, monthly or yearly, every 1 to 52 of them; the form names every week, every
+  2 weeks, every month, every 3 months and every year. Each period is worked out from the first due
+  date, so a bill on the 31st comes back to the 31st after a short month, and one on 29 February
+  falls on the 28th in other years.
+- **Reminders** are the bills page and the Household page, in the app. Nothing is sent: in-app
+  notifications are D12's, in roadmap Phase 17.
+- **No duplicates:** the unique index is on expenses that aren't deleted (D7), so deleting the
+  expense reopens the period; restoring it then is refused if the period was recorded again or
+  skipped. `recurrence_period` is the period's due date.
+- **No scheduler** (ADR-010): periods are worked out on every read and stored only by the action
+  that needs one.
+- **Edits:** details and schedule are changed separately. Periods that have already come keep their
+  dates and expected amount; a new schedule starts today or later.
+- **Disabling** is pausing (or ending). Periods that have already come stay open until recorded or
+  skipped.
+
+### D27 — Recurring bills: who, skipping, pausing (proposed)
+
+- **Who:** any active member adds a bill and records a period. The person who added it, the person
+  who usually pays it, or the owner edits it, changes its schedule, pauses, resumes or ends it, and
+  skips a period or undoes a skip. Nothing approved said; this follows D6 for expenses.
+- **Skipping:** for a bill that didn't come this time. No expense, not paid, kept in the history;
+  "Undo skip" opens the period again. A recorded period can't be skipped, and a skipped one can't be
+  recorded until the skip is undone.
+- **Pausing:** periods that have come stay open; none comes while paused; on resuming, the next
+  period is the first on the schedule from today, and the periods that fell meanwhile never come.
+- **Ending:** no period after today (or after one already paid early); a later last due date can
+  be set again.
+- **Early payment:** the next period can be recorded or skipped before it's due; nothing further
+  ahead.
+- **Due soon:** within 7 days of the due date (`DUE_SOON_DAYS` in `src/lib/bills/schedule.ts`).
+- **Bounds:** a first due date within the past year and the next ten.
 
 ### D16 — Palette contrast
 

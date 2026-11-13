@@ -2,6 +2,11 @@ import Link from "next/link";
 import { io } from "next/cache";
 import {
   BanIcon,
+  CalendarCogIcon,
+  CalendarPlusIcon,
+  CalendarXIcon,
+  CirclePauseIcon,
+  CirclePlayIcon,
   CrownIcon,
   HandCoinsIcon,
   HouseIcon,
@@ -13,7 +18,9 @@ import {
   ReceiptIcon,
   RotateCcwIcon,
   SearchXIcon,
+  SkipForwardIcon,
   Trash2Icon,
+  Undo2Icon,
   UserMinusIcon,
   UserPlusIcon,
   type LucideIcon,
@@ -61,12 +68,20 @@ const ICONS: Record<JournalEntryType, LucideIcon> = {
   expense_restored: RotateCcwIcon,
   settlement_recorded: HandCoinsIcon,
   settlement_voided: BanIcon,
+  bill_created: CalendarPlusIcon,
+  bill_updated: CalendarCogIcon,
+  bill_paused: CirclePauseIcon,
+  bill_resumed: CirclePlayIcon,
+  bill_ended: CalendarXIcon,
+  bill_skipped: SkipForwardIcon,
+  bill_unskipped: Undo2Icon,
 };
 
 /** Token pairs checked by tokens.test.ts; the category is also said in words. */
 const TONES: Record<JournalCategory, string> = {
   expenses: "bg-info-subtle text-info",
   settlements: "bg-secondary text-secondary-foreground",
+  bills: "bg-muted text-muted-foreground",
   household: "bg-highlight-subtle text-highlight-foreground",
 };
 
@@ -80,6 +95,11 @@ const EMPTY: Record<JournalCategory, { title: string; description: string }> = {
     title: "No payments recorded yet",
     description: "When someone records a payment, it will appear here.",
   },
+  bills: {
+    title: "No bill activity yet",
+    description:
+      "When someone adds, changes, pauses or ends a bill, or skips a period, it will appear here. Recording a bill adds an expense.",
+  },
   household: {
     title: "No household activity yet",
     description:
@@ -92,6 +112,7 @@ const END: Record<JournalQuery["filter"], string> = {
   all: "That's the start of the journal.",
   expenses: "That's all the expense activity.",
   settlements: "That's all the payment activity.",
+  bills: "That's all the bill activity.",
   household: "That's all the household activity.",
 };
 
@@ -335,7 +356,9 @@ function JournalItem({
           <p className="type-help">
             {description.category === "expenses"
               ? "This expense is no longer available."
-              : "This payment is no longer available."}
+              : description.category === "bills"
+                ? "This bill is no longer available."
+                : "This payment is no longer available."}
           </p>
         ) : null}
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 type-timestamp">

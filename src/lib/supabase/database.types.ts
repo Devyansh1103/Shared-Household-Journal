@@ -58,6 +58,55 @@ export type Database = {
           },
         ];
       };
+      bill_occurrences: {
+        Row: {
+          bill_id: string;
+          created_at: string;
+          due_on: string;
+          expected_amount_minor: number;
+          household_id: string;
+          id: string;
+          skipped_at: string | null;
+          skipped_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          bill_id: string;
+          created_at?: string;
+          due_on: string;
+          expected_amount_minor: number;
+          household_id: string;
+          id?: string;
+          skipped_at?: string | null;
+          skipped_by?: string | null;
+        };
+        Update: {
+          bill_id?: string;
+          created_at?: string;
+          due_on?: string;
+          expected_amount_minor?: number;
+          household_id?: string;
+          id?: string;
+          skipped_at?: string | null;
+          skipped_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "bill_occurrences_bill_fkey";
+            columns: ["bill_id", "household_id"];
+            isOneToOne: false;
+            referencedRelation: "recurring_bills";
+            referencedColumns: ["id", "household_id"];
+          },
+          {
+            foreignKeyName: "bill_occurrences_skipped_by_fkey";
+            columns: ["skipped_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       expense_splits: {
         Row: {
           expense_id: string;
@@ -112,6 +161,8 @@ export type Database = {
           household_id: string;
           id: string;
           paid_by: string;
+          recurrence_period: string | null;
+          recurring_bill_id: string | null;
           split_method: Database["public"]["Enums"]["split_method"];
           updated_at: string;
         };
@@ -129,6 +180,8 @@ export type Database = {
           household_id: string;
           id?: string;
           paid_by: string;
+          recurrence_period?: string | null;
+          recurring_bill_id?: string | null;
           split_method: Database["public"]["Enums"]["split_method"];
           updated_at?: string;
         };
@@ -145,10 +198,19 @@ export type Database = {
           household_id?: string;
           id?: string;
           paid_by?: string;
+          recurrence_period?: string | null;
+          recurring_bill_id?: string | null;
           split_method?: Database["public"]["Enums"]["split_method"];
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "expenses_bill_occurrence_fkey";
+            columns: ["recurring_bill_id", "recurrence_period", "household_id"];
+            isOneToOne: false;
+            referencedRelation: "bill_occurrences";
+            referencedColumns: ["bill_id", "due_on", "household_id"];
+          },
           {
             foreignKeyName: "expenses_created_by_fkey";
             columns: ["created_by"];
@@ -344,6 +406,142 @@ export type Database = {
         };
         Relationships: [];
       };
+      recurring_bill_shares: {
+        Row: {
+          bill_id: string;
+          household_id: string;
+          percentage_bp: number | null;
+          share_minor: number | null;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          bill_id: string;
+          household_id: string;
+          percentage_bp?: number | null;
+          share_minor?: number | null;
+          user_id: string;
+        };
+        Update: {
+          bill_id?: string;
+          household_id?: string;
+          percentage_bp?: number | null;
+          share_minor?: number | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recurring_bill_shares_bill_fkey";
+            columns: ["bill_id", "household_id"];
+            isOneToOne: false;
+            referencedRelation: "recurring_bills";
+            referencedColumns: ["id", "household_id"];
+          },
+          {
+            foreignKeyName: "recurring_bill_shares_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      recurring_bills: {
+        Row: {
+          amount_minor: number;
+          anchor_on: string;
+          category: Database["public"]["Enums"]["expense_category"];
+          created_at: string;
+          created_by: string;
+          creation_key: string | null;
+          description: string;
+          ends_on: string | null;
+          frequency: Database["public"]["Enums"]["bill_frequency"];
+          household_id: string;
+          id: string;
+          interval_count: number;
+          next_index: number;
+          notes: string | null;
+          paused_at: string | null;
+          paused_by: string | null;
+          payer_id: string;
+          split_method: Database["public"]["Enums"]["split_method"];
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount_minor: number;
+          anchor_on: string;
+          category: Database["public"]["Enums"]["expense_category"];
+          created_at?: string;
+          created_by: string;
+          creation_key?: string | null;
+          description: string;
+          ends_on?: string | null;
+          frequency: Database["public"]["Enums"]["bill_frequency"];
+          household_id: string;
+          id?: string;
+          interval_count: number;
+          next_index?: number;
+          notes?: string | null;
+          paused_at?: string | null;
+          paused_by?: string | null;
+          payer_id: string;
+          split_method: Database["public"]["Enums"]["split_method"];
+          updated_at?: string;
+        };
+        Update: {
+          amount_minor?: number;
+          anchor_on?: string;
+          category?: Database["public"]["Enums"]["expense_category"];
+          created_at?: string;
+          created_by?: string;
+          creation_key?: string | null;
+          description?: string;
+          ends_on?: string | null;
+          frequency?: Database["public"]["Enums"]["bill_frequency"];
+          household_id?: string;
+          id?: string;
+          interval_count?: number;
+          next_index?: number;
+          notes?: string | null;
+          paused_at?: string | null;
+          paused_by?: string | null;
+          payer_id?: string;
+          split_method?: Database["public"]["Enums"]["split_method"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recurring_bills_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recurring_bills_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recurring_bills_paused_by_fkey";
+            columns: ["paused_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recurring_bills_payer_id_fkey";
+            columns: ["payer_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       settlements: {
         Row: {
           amount_minor: number;
@@ -461,12 +659,34 @@ export type Database = {
         };
         Returns: string;
       };
+      create_recurring_bill: {
+        Args: {
+          amount: number;
+          bill_category: Database["public"]["Enums"]["expense_category"];
+          bill_payer_id: string;
+          first_due_on: string;
+          last_due_on?: string;
+          memo?: string;
+          method: Database["public"]["Enums"]["split_method"];
+          repeat_every: number;
+          repeat_unit: Database["public"]["Enums"]["bill_frequency"];
+          request_key?: string;
+          shares: Json;
+          target_household_id: string;
+          title: string;
+        };
+        Returns: string;
+      };
       delete_expense: {
         Args: { target_expense_id: string };
         Returns: undefined;
       };
       delete_household: {
         Args: { target_household_id: string };
+        Returns: undefined;
+      };
+      end_recurring_bill: {
+        Args: { target_bill_id: string };
         Returns: undefined;
       };
       expense_history: {
@@ -500,6 +720,7 @@ export type Database = {
         Args: { focus_user_id?: string; target_household_id: string };
         Returns: Json;
       };
+      household_bills: { Args: { target_household_id: string }; Returns: Json };
       household_journal: {
         Args: {
           before_id?: string;
@@ -514,6 +735,25 @@ export type Database = {
         Args: { target_household_id: string };
         Returns: undefined;
       };
+      pause_recurring_bill: {
+        Args: { target_bill_id: string };
+        Returns: undefined;
+      };
+      record_bill_payment: {
+        Args: {
+          amount: number;
+          expense_category: Database["public"]["Enums"]["expense_category"];
+          method: Database["public"]["Enums"]["split_method"];
+          occurrence_due_on: string;
+          payer_id: string;
+          request_key?: string;
+          shares: Json;
+          spent_on: string;
+          target_bill_id: string;
+          title: string;
+        };
+        Returns: string;
+      };
       record_settlement: {
         Args: {
           acknowledged_owed?: number;
@@ -527,16 +767,39 @@ export type Database = {
         };
         Returns: string;
       };
+      recurring_bill: { Args: { target_bill_id: string }; Returns: Json };
       remove_member: {
         Args: { member_user_id: string; target_household_id: string };
+        Returns: undefined;
+      };
+      reschedule_recurring_bill: {
+        Args: {
+          expected_updated_at?: string;
+          next_due_on: string;
+          repeat_every: number;
+          repeat_unit: Database["public"]["Enums"]["bill_frequency"];
+          target_bill_id: string;
+        };
         Returns: undefined;
       };
       restore_expense: {
         Args: { target_expense_id: string };
         Returns: undefined;
       };
+      resume_recurring_bill: {
+        Args: { target_bill_id: string };
+        Returns: undefined;
+      };
+      skip_bill_occurrence: {
+        Args: { occurrence_due_on: string; target_bill_id: string };
+        Returns: undefined;
+      };
       transfer_ownership: {
         Args: { new_owner_user_id: string; target_household_id: string };
+        Returns: undefined;
+      };
+      unskip_bill_occurrence: {
+        Args: { occurrence_due_on: string; target_bill_id: string };
         Returns: undefined;
       };
       update_expense: {
@@ -553,6 +816,21 @@ export type Database = {
         };
         Returns: undefined;
       };
+      update_recurring_bill: {
+        Args: {
+          amount: number;
+          bill_category: Database["public"]["Enums"]["expense_category"];
+          bill_payer_id: string;
+          expected_updated_at?: string;
+          last_due_on?: string;
+          memo?: string;
+          method: Database["public"]["Enums"]["split_method"];
+          shares: Json;
+          target_bill_id: string;
+          title: string;
+        };
+        Returns: undefined;
+      };
       void_settlement: {
         Args: { target_settlement_id: string };
         Returns: undefined;
@@ -564,7 +842,8 @@ export type Database = {
         | "household_member"
         | "invitation"
         | "expense"
-        | "settlement";
+        | "settlement"
+        | "recurring_bill";
       activity_event_type:
         | "household_created"
         | "member_joined"
@@ -578,7 +857,15 @@ export type Database = {
         | "expense_deleted"
         | "expense_restored"
         | "settlement_recorded"
-        | "settlement_voided";
+        | "settlement_voided"
+        | "bill_created"
+        | "bill_updated"
+        | "bill_paused"
+        | "bill_resumed"
+        | "bill_ended"
+        | "bill_skipped"
+        | "bill_unskipped";
+      bill_frequency: "week" | "month" | "year";
       expense_category:
         | "rent"
         | "utilities"
@@ -723,6 +1010,7 @@ export const Constants = {
         "invitation",
         "expense",
         "settlement",
+        "recurring_bill",
       ],
       activity_event_type: [
         "household_created",
@@ -738,7 +1026,15 @@ export const Constants = {
         "expense_restored",
         "settlement_recorded",
         "settlement_voided",
+        "bill_created",
+        "bill_updated",
+        "bill_paused",
+        "bill_resumed",
+        "bill_ended",
+        "bill_skipped",
+        "bill_unskipped",
       ],
+      bill_frequency: ["week", "month", "year"],
       expense_category: [
         "rent",
         "utilities",

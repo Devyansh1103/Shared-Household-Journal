@@ -429,8 +429,171 @@ describe("payment entries (D9)", () => {
   });
 });
 
+describe("bill entries (roadmap Phase 14)", () => {
+  const BILL = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const billEntity: JournalEntity = {
+    available: true,
+    id: BILL,
+    state: "active",
+  };
+  const rent = {
+    description: "Rent",
+    amountMinor: BigInt(2000000),
+    category: "rent" as const,
+    payerId: OLIVE,
+    frequency: "month" as const,
+    every: 1,
+    anchorOn: "2026-12-01",
+    endsOn: null,
+  };
+
+  it("say who added a bill, what it is, how often, and link to it", () => {
+    expect(
+      describeForPat(
+        entry({ type: "bill_created", bill: rent }, { entity: billEntity }),
+      ),
+    ).toEqual({
+      category: "bills",
+      categoryLabel: "Bill",
+      title: "Olive added a bill",
+      summary: "Rent — ₹20,000.00 expected",
+      context: ["Every month, from 1 Dec 2026"],
+      changes: [],
+      link: {
+        href: `/households/${HOUSEHOLD}/bills/${BILL}`,
+        label: "View bill",
+        accessibleLabel: "View bill: Rent",
+      },
+      unavailable: false,
+    });
+  });
+
+  it("list what a change changed, old and new", () => {
+    const d = describeForPat(
+      entry(
+        {
+          type: "bill_updated",
+          before: rent,
+          after: {
+            ...rent,
+            amountMinor: BigInt(2100000),
+            payerId: PAT,
+            frequency: "week",
+            every: 2,
+            anchorOn: "2027-01-04",
+            endsOn: "2027-12-31",
+          },
+        },
+        { entity: billEntity },
+      ),
+    );
+    expect(d.title).toBe("Olive changed a bill");
+    expect(d.changes).toEqual([
+      {
+        kind: "value",
+        label: "Expected amount",
+        from: "₹20,000.00",
+        to: "₹21,000.00",
+      },
+      { kind: "value", label: "Usually paid by", from: "Olive", to: "you" },
+      {
+        kind: "value",
+        label: "Schedule",
+        from: "Every month, from 1 Dec 2026",
+        to: "Every 2 weeks, from 4 Jan 2027",
+      },
+      {
+        kind: "value",
+        label: "Last due date",
+        from: "none",
+        to: "31 Dec 2027",
+      },
+    ]);
+  });
+
+  it("say who paused, resumed, ended or skipped, never that anything was paid", () => {
+    const title = (detail: JournalDetail) =>
+      describeForPat(entry(detail, { entity: billEntity })).title;
+    expect(title({ type: "bill_paused", description: "Rent" })).toBe(
+      "Olive paused a bill",
+    );
+    expect(title({ type: "bill_resumed", description: "Rent" })).toBe(
+      "Olive resumed a bill",
+    );
+    const ended = describeForPat(
+      entry(
+        { type: "bill_ended", description: "Rent", endsOn: "2026-11-13" },
+        { entity: billEntity },
+      ),
+    );
+    expect([ended.title, ended.context]).toEqual([
+      "Olive ended a bill",
+      ["Last due date 13 Nov 2026"],
+    ]);
+    const skipped = describeForPat(
+      entry(
+        { type: "bill_skipped", description: "Rent", dueOn: "2026-12-01" },
+        { actorId: PAT, entity: billEntity },
+      ),
+    );
+    expect(skipped).toMatchObject({
+      title: "You skipped a bill period",
+      summary: "Rent, due 1 Dec 2026",
+      context: ["Nothing was recorded for it"],
+    });
+    expect(
+      title({
+        type: "bill_unskipped",
+        description: "Rent",
+        dueOn: "2026-12-01",
+      }),
+    ).toBe("Olive undid skipping a bill period");
+    expect(
+      describeForPat(
+        entry(
+          { type: "bill_paused", description: "Rent" },
+          { entity: { available: false } },
+        ),
+      ),
+    ).toMatchObject({ link: null, unavailable: true });
+  });
+});
+
 describe("every entry", () => {
   const all: JournalEntry[] = [
+    entry(
+      {
+        type: "bill_updated",
+        before: {
+          description: "Rent",
+          amountMinor: BigInt(1),
+          category: "rent",
+          payerId: GONE,
+          frequency: "year",
+          every: 1,
+          anchorOn: "2026-12-01",
+          endsOn: null,
+        },
+        after: {
+          description: "Rent",
+          amountMinor: BigInt(2),
+          category: "rent",
+          payerId: GONE,
+          frequency: "year",
+          every: 1,
+          anchorOn: "2026-12-01",
+          endsOn: null,
+        },
+      },
+      { actorId: GONE, entity: { available: false } },
+    ),
+    entry(
+      { type: "bill_skipped", description: "Rent", dueOn: "2026-12-01" },
+      {
+        actorId: GONE,
+        entity: { available: true, id: EXPENSE, state: "paused" },
+      },
+    ),
     entry({ type: "household_created", name: "Flat 4B" }),
     entry({ type: "member_joined", userId: GONE, inviterId: GONE }),
     entry({ type: "member_left", userId: GONE }),

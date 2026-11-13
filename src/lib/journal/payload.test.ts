@@ -43,6 +43,17 @@ const settlementDetail = {
   settled_on: "2026-11-12",
   recorded_by: PAT,
 };
+const BILL = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const billDetail = {
+  description: "Rent",
+  amount_minor: "2000000",
+  category: "rent",
+  payer_id: OLIVE,
+  frequency: "month",
+  interval_count: 1,
+  anchor_on: "2026-12-01",
+  ends_on: null,
+};
 
 const DETAILS: Record<JournalEntryType, unknown> = {
   household_created: { name: "Flat 4B" },
@@ -62,6 +73,16 @@ const DETAILS: Record<JournalEntryType, unknown> = {
   expense_restored: expenseDetail,
   settlement_recorded: settlementDetail,
   settlement_voided: settlementDetail,
+  bill_created: billDetail,
+  bill_updated: {
+    before: billDetail,
+    after: { ...billDetail, amount_minor: "2100000" },
+  },
+  bill_paused: { description: "Rent" },
+  bill_resumed: { description: "Rent" },
+  bill_ended: { description: "Rent", ends_on: "2027-06-01" },
+  bill_skipped: { description: "Rent", due_on: "2026-12-01" },
+  bill_unskipped: { description: "Rent", due_on: "2026-12-01" },
 };
 
 function entityFor(type: JournalEntryType) {
@@ -71,6 +92,9 @@ function entityFor(type: JournalEntryType) {
   }
   if (category === "settlements") {
     return { available: true, id: SETTLEMENT, state: "active" };
+  }
+  if (category === "bills") {
+    return { available: true, id: BILL, state: "active" };
   }
   return null;
 }
@@ -256,6 +280,7 @@ describe("entryCategory", () => {
       ...Array(7).fill("household"),
       ...Array(4).fill("expenses"),
       ...Array(2).fill("settlements"),
+      ...Array(7).fill("bills"),
     ]);
   });
 });
@@ -329,7 +354,19 @@ describe("checkJournal", () => {
     const [expense] = rowsOf(["expense_created"]);
     const [payment] = rowsOf(["settlement_voided"]);
     const [member] = rowsOf(["member_left"]);
+    const [bill] = rowsOf(["bill_paused"]);
+    expect(
+      checkJournal(
+        parsed([
+          { ...bill, entity: { available: true, id: BILL, state: "paused" } },
+        ]),
+        options,
+      ),
+    ).toEqual({ ok: true });
     for (const row of [
+      { ...bill, entity: { available: true, id: BILL, state: "deleted" } },
+      { ...bill, entity: null },
+      { ...expense, entity: { available: true, id: EXPENSE, state: "paused" } },
       { ...expense, entity: null },
       { ...expense, entity: { available: true, id: EXPENSE, state: "voided" } },
       {

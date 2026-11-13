@@ -90,7 +90,7 @@ every split); a settlement's full snapshot (people, amount, date, note, recorder
 otherwise, including for a household id that doesn't exist), and everything in one answer is one
 snapshot. It returns a read model, never raw events:
 
-- **An allowlist of types.** Only the 13 types above. A type added in a later phase stays out of the
+- **An allowlist of types.** Only the 20 types above (the seven bill types since roadmap Phase 14). A type added in a later phase stays out of the
   journal until it's added to this function and to `ENTRY_CATEGORIES` in
   [payload.ts](../src/lib/journal/payload.ts) (the TypeScript check fails until it is).
 - **Only the fields each entry needs:** names of things, amounts as text, dates, and people's ids. No
@@ -116,7 +116,7 @@ entries.
   strictly older. A page never repeats or skips an entry, and entries written while someone pages
   through appear at the top, never in the older pages. The function fetches one extra row to know
   whether there are older entries; it never reads the whole history.
-- **Filters** (`?show=expenses|settlements|household`) apply in SQL. Changing the filter goes back to
+- **Filters** (`?show=expenses|settlements|bills|household`) apply in SQL. Changing the filter goes back to
   the newest entries.
 - **Refused input** (`22023`): an unknown filter, a page size outside 1–100, half a cursor, or a cursor
   time outside 0 to 9999-12-31. The app validates the URL first ([query.ts](../src/lib/journal/query.ts))
@@ -142,7 +142,7 @@ Household tab stays active on it: the bottom bar has room for five tabs at 360px
 settlements under Balances.
 
 - **Header:** "Household journal" and the household's name in the description.
-- **Filters:** All activity, Expenses, Settlements, Household. They're links, so each view has its
+- **Filters:** All activity, Expenses, Settlements, Bills, Household. They're links, so each view has its
   own URL; the current one has `aria-current`, a check icon and a heavier weight.
 - **Days**, in the household's timezone (D11): Today, Yesterday, Earlier this week (from the week's
   first day, D25's `WEEK_STARTS_ON`, the same as the expense history's "This week"), then one heading
@@ -178,7 +178,7 @@ Phase 18; it changes a security policy, so it needs the owner's approval.
 - No live updates: the page shows the journal as of loading it.
 - Comments, reactions, notifications, exports and summaries aren't part of the journal (Phase 17 adds
   in-app notifications, which will read these events, D12).
-- Recurring bills, shopping, chores and budgets write no events yet; each phase adds its own types
+- Shopping, chores and budgets write no events yet (recurring bills do, since roadmap Phase 14); each phase adds its own types
   (and adds them to the allowlist on purpose).
 - Renaming a household isn't journalled; the app has no way to rename one.
 - Folding automatic invite revocations into a leave or removal relies on the two events sharing their

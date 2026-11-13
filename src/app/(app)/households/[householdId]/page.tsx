@@ -17,6 +17,7 @@ import {
   listInvitations,
   listMembers,
 } from "@/lib/households/queries";
+import { BillsReminder, BillsReminderSkeleton } from "./bills-reminder";
 import { InvitePanel } from "./invite-panel";
 import { InvitationList } from "./invitation-list";
 import { MemberList } from "./member-list";
@@ -140,6 +141,15 @@ async function HouseholdContent({
             </Link>
           </Button>
         </div>
+      </Section>
+
+      <Section
+        title="Bills"
+        description="Bills that repeat, like rent or electricity: what's due and what's coming. Each is recorded as an expense when it's paid."
+      >
+        <Suspense fallback={<BillsReminderSkeleton />}>
+          <BillsReminder householdId={household.id} />
+        </Suspense>
       </Section>
 
       <Section

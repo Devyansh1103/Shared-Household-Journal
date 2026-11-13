@@ -1,7 +1,8 @@
 // Postgres error codes from the household functions mapped to plain messages.
 // Codes HJ001–HJ005 are defined in the Phase 6 migration, HJ006–HJ012 in the
-// expenses migration, HJ013 in the balances migration and HJ014–HJ017 in the
-// settlements migration. Raw database messages are never shown.
+// expenses migration, HJ013 in the balances migration, HJ014–HJ017 in the
+// settlements migration and HJ018–HJ025 in the recurring bills migration.
+// Raw database messages are never shown.
 
 import { GENERIC_ERROR } from "@/lib/auth/errors";
 
@@ -36,6 +37,18 @@ const MESSAGES: Record<string, string> = {
     "A payment is recorded between two different current members of the household. Someone here may have left.",
   HJ017:
     "That's more than what's owed right now. Check the figures and try again.",
+  HJ018: "We couldn't find that bill.",
+  HJ019:
+    "Those dates don't work for this bill. A new schedule starts today or later, after every period so far, and the last due date can't be before a period that has already come.",
+  HJ020:
+    "Someone changed this bill while you were editing. Reload the page to see their changes, then try again.",
+  HJ021: "That can't be done to this bill right now. Reload the page.",
+  HJ022: "That period is already recorded. Reload the page to see it.",
+  HJ023: "That period is skipped, or isn't any more. Reload the page.",
+  HJ024:
+    "That period can't be recorded or skipped yet. Only periods that have come, and the next one, can.",
+  HJ025:
+    "That bill period has been recorded again or skipped since this expense was deleted, so it can't be restored.",
   "42501": "You don't have permission to do that.",
   "23514": "Some of those details aren't valid. Check them and try again.",
   "22023": "Choose a timezone from the list.",
