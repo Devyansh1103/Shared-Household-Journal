@@ -52,6 +52,10 @@ describe("isActive", () => {
       "balances",
     ]);
     expect(at(`/households/${HOUSEHOLD}/settlementsx`)).toEqual([]);
+    // The journal is part of Household (roadmap Phase 13).
+    expect(at(`/households/${HOUSEHOLD}/journal`)).toEqual(["household"]);
+    expect(at(`/households/${HOUSEHOLD}/journal/`)).toEqual(["household"]);
+    expect(at(`/households/${HOUSEHOLD}/journalx`)).toEqual([]);
     expect(at(`/households/${HOUSEHOLD}x`)).toEqual([]);
     expect(at("/households/new")).toEqual([]);
   });

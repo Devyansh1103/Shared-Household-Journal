@@ -13,6 +13,7 @@ Records shared household expenses and home coordination. **The app never moves m
 - [docs/design-system.md](docs/design-system.md): design tokens, typography, components
 - [docs/knowledge-base.md](docs/knowledge-base.md): glossary and repository facts
 - [docs/money.md](docs/money.md): money representation, ISO 4217 decimals, the split engine, rounding, balances (sign convention and invariants) and error codes
+- [docs/journal.md](docs/journal.md): the household journal: which events are shown and how, consistency and visibility, pages and privacy
 
 ## Commands (npm only)
 

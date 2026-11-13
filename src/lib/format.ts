@@ -79,3 +79,40 @@ export function formatDateTime(
     timeZone,
   }).format(new Date(instant));
 }
+
+/** The time of day of an instant in the household's timezone (D11): "10:30 am". */
+export function formatTime(instant: string | Date, timeZone: string): string {
+  return new Intl.DateTimeFormat(LOCALE, {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  }).format(new Date(instant));
+}
+
+/** The weekday and time of an instant in the household's timezone: "Fri, 10:30 am". */
+export function formatWeekdayTime(
+  instant: string | Date,
+  timeZone: string,
+): string {
+  return new Intl.DateTimeFormat(LOCALE, {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  }).format(new Date(instant));
+}
+
+/**
+ * A calendar date ("YYYY-MM-DD") in full, with its weekday, without shifting
+ * it across timezones (D11): "Friday, 6 November 2026".
+ */
+export function formatLongDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Intl.DateTimeFormat(LOCALE, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}

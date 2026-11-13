@@ -500,6 +500,16 @@ export type Database = {
         Args: { focus_user_id?: string; target_household_id: string };
         Returns: Json;
       };
+      household_journal: {
+        Args: {
+          before_id?: string;
+          before_us?: number;
+          category_filter?: string;
+          page_size?: number;
+          target_household_id: string;
+        };
+        Returns: Json;
+      };
       leave_household: {
         Args: { target_household_id: string };
         Returns: undefined;

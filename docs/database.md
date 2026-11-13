@@ -32,10 +32,10 @@ New migrations: `npx supabase migration new <name>`, then apply locally with
 
 ## Tables and columns (Phase 6)
 
-| Table / column            | Purpose                                     | Key constraints                                                                                                                                                                                                                                    |
-| ------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `households.creation_key` | Makes `create_household` idempotent         | Unique per (`created_by`, `creation_key`) when not null. The create form sends a fresh uuid per page visit, so a repeated submission returns the first household.                                                                                  |
-| `activity_events`         | Append-only household journal (feed UI: 13) | `type` enum `activity_event_type`, `entity_type` enum `activity_entity_type`, `summary` must be a JSON object (ids and minimal context only, no emails or tokens). `actor_id` is null only for changes made outside a user session (service role). |
+| Table / column            | Purpose                                                                               | Key constraints                                                                                                                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `households.creation_key` | Makes `create_household` idempotent                                                   | Unique per (`created_by`, `creation_key`) when not null. The create form sends a fresh uuid per page visit, so a repeated submission returns the first household.                                                                                  |
+| `activity_events`         | Append-only household journal (feed: [Phase 13](#household-journal-roadmap-phase-13)) | `type` enum `activity_event_type`, `entity_type` enum `activity_entity_type`, `summary` must be a JSON object (ids and minimal context only, no emails or tokens). `actor_id` is null only for changes made outside a user session (service role). |
 
 Events written so far: `household_created`, `member_joined`, `member_left`, `member_removed`,
 `ownership_transferred` (from the functions below) and `invitation_created`, `invitation_revoked`
@@ -258,6 +258,51 @@ filter, each sort against plain Postgres ordering, pages, the summary against an
 access, refused input, and that reading history changes nothing), and
 [e2e/expense-history.spec.ts](../e2e/expense-history.spec.ts) (in a browser, desktop and phone).
 
+## Household journal (roadmap Phase 13)
+
+Migration `20261116120000_household_journal.sql`: one read function and three pure helpers. No
+tables, columns, indexes, policies or data changes. The events themselves have been written since
+Phase 6, in the same transaction as each change; see [journal.md](journal.md) for what's shown, the
+consistency guarantees and the visibility rules.
+
+`public.household_journal(target_household_id, category_filter?, before_us?, before_id?, page_size?)`
+is `security invoker` and `stable`, `EXECUTE` for `authenticated` only. It raises `42501` unless the
+caller is an active member, and RLS applies as well. One answer, one snapshot:
+
+- **Rows:** one page (default 25, at most 100) of the household's events, newest first by
+  `(created_at, id)`, strictly older than the cursor (`before_us`, microseconds since the epoch, and
+  `before_id`), optionally only `expenses`, `settlements` or `household` events. Only an allowlist of
+  the 13 existing types; invite links revoked in the same transaction as their creator leaving or
+  being removed are left out (they stay stored).
+- **Each row:** its id, household, type, actor, `created_us` (exact, as text) and only the fields its
+  entry shows, from the stored summary: no settlement notes, split shares, invite settings or raw
+  summary. For expense and payment events, whether the record is still in this household (`entity`:
+  `{ available, id, state }`, `state` being `active`, `deleted` or `voided`).
+- **`has_more`:** whether older rows exist (one extra row is read to know).
+- **`people`:** display name and active status of everyone the rows mention.
+
+Helpers `private.journal_expense`, `journal_expense_change` and `journal_settlement` pick the fields
+from a stored snapshot. They're `immutable`, read no table, and are `EXECUTE` for `authenticated`
+because the invoker function calls them; the `private` schema isn't exposed through the Data API.
+
+Refused with `22023`: an unknown category, a page size outside 1–100, half a cursor, or a cursor time
+outside 0 to 9999-12-31. The app validates all of this first ([query.ts](../src/lib/journal/query.ts))
+and checks the answer before showing it ([payload.ts](../src/lib/journal/payload.ts)).
+
+**Indexes.** None added. Pages scan the Phase 6 index on `(household_id, created_at desc)` and sort
+ties by id incrementally. Measured 2026-11-13 with 20,000 events in one household next to 50,000 in
+another: 7–28 ms for a first page, 10–30 ms filtered, 4–14 ms deep in the history. A filter with few
+or no matching events in such a household takes about 0.5 s: the RLS check runs on each event scanned,
+and since `enum_eq` isn't leakproof, Postgres can't narrow the scan by type under RLS, so an index on
+the type doesn't help (tried). The set-based policy noted for Phase 18 above would fix both; it needs
+the owner's approval.
+
+Tests: [supabase/tests/journal.test.ts](../supabase/tests/journal.test.ts) (an entry for every
+operation; none for refused ones; one for retries, repeated transitions and concurrent calls; a failed
+event write stops the operation and a rollback removes both; order against Postgres, ties, pages of
+every size, filters, cursors; access; privacy; no money changes) and the unit tests in
+[src/lib/journal/](../src/lib/journal/).
+
 ## Access control
 
 RLS is enabled on every table, with deny by default. Policies apply to `authenticated` only. `anon` has
@@ -296,6 +341,6 @@ Members who leave or are removed lose access immediately, because every check re
 - How a former member's balance is settled is still open (O9): new settlements need two active
   members.
 - D9's in-app notification to the other party arrives with notifications (Phase 17, D12); the
-  `settlement_recorded` event it will use is written now.
+  `settlement_recorded` event it will use is written now (and shown in the journal since Phase 13).
 - `expenses.recurring_bill_id` / `recurrence_period` and their unique key arrive with recurring
   bills (Phase 14).

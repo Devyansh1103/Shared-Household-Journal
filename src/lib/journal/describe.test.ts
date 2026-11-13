@@ -1,0 +1,505 @@
+import { describe, expect, it } from "vitest";
+import { entryDescriber, type EntryDescription } from "./describe";
+import type {
+  ExpenseChangeFields,
+  JournalDetail,
+  JournalEntity,
+  JournalEntry,
+  JournalPerson,
+} from "./payload";
+
+const HOUSEHOLD = "6f1c2f4e-8a7b-4c3d-9e2f-1a2b3c4d5e6f";
+const OLIVE = "11111111-1111-4111-8111-111111111111";
+const PAT = "22222222-2222-4222-8222-222222222222";
+const QUIN = "33333333-3333-4333-8333-333333333333";
+const RAJ = "44444444-4444-4444-8444-444444444444";
+const GONE = "55555555-5555-4555-8555-555555555555";
+const EXPENSE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const SETTLEMENT = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+const PEOPLE: JournalPerson[] = [
+  { userId: OLIVE, displayName: "Olive", isActive: true },
+  { userId: PAT, displayName: "Pat", isActive: true },
+  { userId: QUIN, displayName: "Quin", isActive: false },
+  { userId: RAJ, displayName: "Raj", isActive: true },
+];
+
+/** Described as Pat sees it, in a household that uses rupees. */
+const describeForPat = entryDescriber({
+  householdId: HOUSEHOLD,
+  viewerId: PAT,
+  currency: "INR",
+  people: PEOPLE,
+});
+
+const activeExpense: JournalEntity = {
+  available: true,
+  id: EXPENSE,
+  state: "active",
+};
+const activePayment: JournalEntity = {
+  available: true,
+  id: SETTLEMENT,
+  state: "active",
+};
+
+function entry(
+  detail: JournalDetail,
+  {
+    actorId = OLIVE,
+    entity = null,
+  }: { actorId?: string | null; entity?: JournalEntity | null } = {},
+): JournalEntry {
+  return {
+    id: "e0000000-0000-4000-8000-000000000001",
+    householdId: HOUSEHOLD,
+    actorId,
+    createdUs: BigInt("1763029800000000"),
+    detail,
+    entity,
+  };
+}
+
+const groceries = {
+  description: "Groceries",
+  amountMinor: BigInt(125000),
+  category: "groceries" as const,
+  paidBy: OLIVE,
+};
+
+const beforeEdit: ExpenseChangeFields = {
+  ...groceries,
+  expenseDate: "2026-11-12",
+  splitMethod: "equal",
+  participants: [OLIVE, PAT],
+};
+
+function updated(
+  after: Partial<ExpenseChangeFields>,
+  sharesChanged = false,
+): JournalEntry {
+  return entry(
+    {
+      type: "expense_updated",
+      before: beforeEdit,
+      after: { ...beforeEdit, ...after },
+      sharesChanged,
+    },
+    { entity: activeExpense },
+  );
+}
+
+/** Every piece of text an entry shows (not its link target). */
+function texts(d: EntryDescription): string[] {
+  return [
+    d.title,
+    d.summary ?? "",
+    d.categoryLabel,
+    ...d.context,
+    ...d.changes.flatMap((c) =>
+      c.kind === "value" ? [c.label, c.from, c.to] : [c.label, c.text],
+    ),
+    d.link?.label ?? "",
+    d.link?.accessibleLabel ?? "",
+  ];
+}
+
+describe("household entries", () => {
+  it("say who created the household, joined, left or was removed", () => {
+    expect(
+      describeForPat(entry({ type: "household_created", name: "Flat 4B" })),
+    ).toMatchObject({
+      category: "household",
+      categoryLabel: "Household",
+      title: "Olive created the household “Flat 4B”",
+      summary: null,
+      link: null,
+    });
+
+    const joined = describeForPat(
+      entry(
+        { type: "member_joined", userId: PAT, inviterId: OLIVE },
+        { actorId: PAT },
+      ),
+    );
+    expect(joined.title).toBe("You joined the household");
+    expect(joined.context).toEqual(["Invited by Olive"]);
+    expect(joined.link).toEqual({
+      href: `/households/${HOUSEHOLD}#members`,
+      label: "See members",
+      accessibleLabel: "See members",
+    });
+
+    expect(
+      describeForPat(
+        entry(
+          { type: "member_joined", userId: RAJ, inviterId: null },
+          { actorId: RAJ },
+        ),
+      ).context,
+    ).toEqual([]);
+    expect(
+      describeForPat(
+        entry(
+          { type: "member_joined", userId: RAJ, inviterId: PAT },
+          { actorId: RAJ },
+        ),
+      ).context,
+    ).toEqual(["Invited by you"]);
+
+    // The sentence says they left, so no "(left)" label here.
+    expect(
+      describeForPat(
+        entry({ type: "member_left", userId: QUIN }, { actorId: QUIN }),
+      ).title,
+    ).toBe("Quin left the household");
+    expect(
+      describeForPat(entry({ type: "member_removed", userId: QUIN })).title,
+    ).toBe("Olive removed Quin from the household");
+    // Elsewhere, someone who has since left keeps the label (D13).
+    expect(
+      describeForPat(
+        entry(
+          { type: "member_joined", userId: QUIN, inviterId: OLIVE },
+          { actorId: QUIN },
+        ),
+      ).title,
+    ).toBe("Quin (left) joined the household");
+  });
+
+  it("say who handed over ownership and what happened to invite links", () => {
+    expect(
+      describeForPat(
+        entry({
+          type: "ownership_transferred",
+          fromUserId: OLIVE,
+          toUserId: PAT,
+        }),
+      ).title,
+    ).toBe("Olive made you the owner");
+    expect(
+      describeForPat(
+        entry(
+          { type: "ownership_transferred", fromUserId: PAT, toUserId: RAJ },
+          { actorId: PAT },
+        ),
+      ).title,
+    ).toBe("You made Raj the owner");
+
+    const created = describeForPat(entry({ type: "invitation_created" }));
+    expect(created.title).toBe("Olive created an invite link");
+    expect(created.link?.href).toBe(`/households/${HOUSEHOLD}#invite-links`);
+
+    expect(
+      describeForPat(entry({ type: "invitation_revoked", createdBy: OLIVE })),
+    ).toMatchObject({ title: "Olive revoked an invite link", context: [] });
+    expect(
+      describeForPat(entry({ type: "invitation_revoked", createdBy: PAT }))
+        .context,
+    ).toEqual(["Created by you"]);
+  });
+});
+
+describe("expense entries", () => {
+  it("say who added, deleted or restored what, for how much, paid by whom", () => {
+    const added = describeForPat(
+      entry(
+        { type: "expense_created", expense: groceries },
+        { entity: activeExpense },
+      ),
+    );
+    expect(added).toEqual({
+      category: "expenses",
+      categoryLabel: "Expense",
+      title: "Olive added an expense",
+      summary: "Groceries — ₹1,250.00",
+      context: ["Paid by Olive"],
+      changes: [],
+      link: {
+        href: `/households/${HOUSEHOLD}/expenses/${EXPENSE}`,
+        label: "View expense",
+        accessibleLabel: "View expense: Groceries",
+      },
+      unavailable: false,
+    });
+
+    const deleted = describeForPat(
+      entry(
+        { type: "expense_deleted", expense: { ...groceries, paidBy: PAT } },
+        {
+          actorId: PAT,
+          entity: { available: true, id: EXPENSE, state: "deleted" },
+        },
+      ),
+    );
+    expect(deleted.title).toBe("You deleted an expense");
+    expect(deleted.context).toEqual(["Paid by you"]);
+    expect(deleted.link?.label).toBe("View deleted expense");
+    expect(deleted.link?.accessibleLabel).toBe(
+      "View deleted expense: Groceries",
+    );
+
+    expect(
+      describeForPat(
+        entry(
+          { type: "expense_restored", expense: groceries },
+          { entity: activeExpense },
+        ),
+      ).title,
+    ).toBe("Olive restored an expense");
+  });
+
+  it("name people who have left, and never show an unknown person's id", () => {
+    const d = describeForPat(
+      entry(
+        { type: "expense_created", expense: { ...groceries, paidBy: GONE } },
+        { actorId: QUIN, entity: activeExpense },
+      ),
+    );
+    expect(d.title).toBe("Quin (left) added an expense");
+    expect(d.context).toEqual(["Paid by Former member"]);
+    expect(
+      describeForPat(entry({ type: "invitation_created" }, { actorId: null }))
+        .title,
+    ).toBe("Someone created an invite link");
+  });
+
+  it("link nowhere when the expense isn't in the household any more", () => {
+    const d = describeForPat(
+      entry(
+        { type: "expense_created", expense: groceries },
+        { entity: { available: false } },
+      ),
+    );
+    expect(d.link).toBeNull();
+    expect(d.unavailable).toBe(true);
+  });
+});
+
+describe("expense edits (D6)", () => {
+  it("list each field that changed, old and new", () => {
+    const d = describeForPat(
+      updated({
+        description: "Groceries and milk",
+        amountMinor: BigInt(130050),
+        category: "household_supplies",
+        expenseDate: "2026-11-13",
+        paidBy: PAT,
+        splitMethod: "percentage",
+      }),
+    );
+    expect(d.title).toBe("Olive edited an expense");
+    expect(d.summary).toBe("Groceries and milk — ₹1,300.50");
+    expect(d.changes).toEqual([
+      {
+        kind: "value",
+        label: "Description",
+        from: "“Groceries”",
+        to: "“Groceries and milk”",
+      },
+      { kind: "value", label: "Amount", from: "₹1,250.00", to: "₹1,300.50" },
+      {
+        kind: "value",
+        label: "Category",
+        from: "Groceries",
+        to: "Household supplies",
+      },
+      { kind: "value", label: "Date", from: "12 Nov 2026", to: "13 Nov 2026" },
+      { kind: "value", label: "Paid by", from: "Olive", to: "you" },
+      { kind: "value", label: "Split", from: "Equally", to: "By percentage" },
+    ]);
+  });
+
+  it("say who was added to or removed from the split, by name", () => {
+    expect(
+      describeForPat(updated({ participants: [OLIVE, PAT, QUIN, RAJ] }))
+        .changes,
+    ).toEqual([
+      {
+        kind: "text",
+        label: "Who shares it",
+        text: "added Quin (left) and Raj",
+      },
+    ]);
+    expect(
+      describeForPat(updated({ participants: [OLIVE, RAJ] }, true)).changes,
+    ).toEqual([
+      {
+        kind: "text",
+        label: "Who shares it",
+        text: "added Raj; removed you",
+      },
+    ]);
+  });
+
+  it("mention changed shares only when nothing else explains them", () => {
+    expect(describeForPat(updated({}, true)).changes).toEqual([
+      { kind: "text", label: "Shares", text: "changed" },
+    ]);
+    expect(
+      describeForPat(updated({ amountMinor: BigInt(200000) }, true)).changes,
+    ).toEqual([
+      { kind: "value", label: "Amount", from: "₹1,250.00", to: "₹2,000.00" },
+    ]);
+    expect(
+      describeForPat(updated({ splitMethod: "custom" }, true)).changes,
+    ).toEqual([
+      {
+        kind: "value",
+        label: "Split",
+        from: "Equally",
+        to: "By custom amounts",
+      },
+    ]);
+    expect(describeForPat(updated({}, false)).changes).toEqual([]);
+  });
+});
+
+describe("payment entries (D9)", () => {
+  const payment = {
+    fromUser: OLIVE,
+    toUser: PAT,
+    amountMinor: BigInt(50000),
+    settledOn: "2026-11-12",
+    recordedBy: OLIVE,
+  };
+
+  it("use D9's wording, whichever of the two recorded it", () => {
+    const byPayer = describeForPat(
+      entry(
+        { type: "settlement_recorded", settlement: payment },
+        { entity: activePayment },
+      ),
+    );
+    expect(byPayer).toMatchObject({
+      category: "settlements",
+      categoryLabel: "Payment",
+      title: "Olive recorded a payment of ₹500.00 to you",
+      summary: null,
+      context: ["Paid on 12 Nov 2026"],
+      link: {
+        href: `/households/${HOUSEHOLD}/settlements/${SETTLEMENT}`,
+        label: "View payment",
+        accessibleLabel: "View payment: Payment from Olive to you, ₹500.00",
+      },
+    });
+
+    const byRecipient = describeForPat(
+      entry(
+        {
+          type: "settlement_recorded",
+          settlement: { ...payment, recordedBy: PAT },
+        },
+        { actorId: PAT, entity: activePayment },
+      ),
+    );
+    expect(byRecipient.title).toBe(
+      "You recorded a payment of ₹500.00 from Olive",
+    );
+  });
+
+  it("say a voided payment no longer counts, and link to it as voided", () => {
+    const d = describeForPat(
+      entry(
+        { type: "settlement_voided", settlement: payment },
+        {
+          actorId: RAJ,
+          entity: { available: true, id: SETTLEMENT, state: "voided" },
+        },
+      ),
+    );
+    expect(d).toMatchObject({
+      title: "Raj voided a payment",
+      summary: "Payment from Olive to you — ₹500.00",
+      context: ["Paid on 12 Nov 2026", "It no longer counts towards balances"],
+      link: { label: "View voided payment" },
+    });
+  });
+
+  it("never claim money was sent, transferred or completed", () => {
+    for (const type of ["settlement_recorded", "settlement_voided"] as const) {
+      const text = texts(
+        describeForPat(
+          entry({ type, settlement: payment }, { entity: activePayment }),
+        ),
+      ).join(" ");
+      expect(text).not.toMatch(/sent|transfer|complete|pending/i);
+    }
+  });
+});
+
+describe("every entry", () => {
+  const all: JournalEntry[] = [
+    entry({ type: "household_created", name: "Flat 4B" }),
+    entry({ type: "member_joined", userId: GONE, inviterId: GONE }),
+    entry({ type: "member_left", userId: GONE }),
+    entry({ type: "member_removed", userId: GONE }),
+    entry({ type: "ownership_transferred", fromUserId: GONE, toUserId: GONE }),
+    entry({ type: "invitation_created" }, { actorId: GONE }),
+    entry({ type: "invitation_revoked", createdBy: GONE }),
+    entry(
+      { type: "expense_created", expense: { ...groceries, paidBy: GONE } },
+      { entity: activeExpense },
+    ),
+    updated({ paidBy: GONE, participants: [GONE, OLIVE] }, true),
+    entry(
+      { type: "expense_deleted", expense: groceries },
+      { entity: { available: false } },
+    ),
+    entry(
+      { type: "expense_restored", expense: groceries },
+      { entity: activeExpense },
+    ),
+    entry(
+      {
+        type: "settlement_recorded",
+        settlement: {
+          fromUser: GONE,
+          toUser: OLIVE,
+          amountMinor: BigInt(1),
+          settledOn: "2026-11-12",
+          recordedBy: GONE,
+        },
+      },
+      { entity: activePayment },
+    ),
+    entry(
+      {
+        type: "settlement_voided",
+        settlement: {
+          fromUser: OLIVE,
+          toUser: GONE,
+          amountMinor: BigInt(1),
+          settledOn: "2026-11-12",
+          recordedBy: OLIVE,
+        },
+      },
+      { entity: { available: false } },
+    ),
+  ];
+
+  it("shows no ids in its words, even for people the page doesn't know", () => {
+    for (const e of all) {
+      const d = describeForPat(e);
+      expect(d.title).not.toBe("");
+      for (const text of texts(d)) {
+        expect(text, `${e.detail.type}: ${text}`).not.toMatch(UUID);
+      }
+    }
+  });
+
+  it("links only inside this household", () => {
+    for (const e of all) {
+      const href = describeForPat(e).link?.href;
+      if (href) expect(href.startsWith(`/households/${HOUSEHOLD}`)).toBe(true);
+    }
+  });
+
+  it("gives each link an accessible name that starts with its visible words", () => {
+    for (const e of all) {
+      const link = describeForPat(e).link;
+      if (link) expect(link.accessibleLabel.startsWith(link.label)).toBe(true);
+    }
+  });
+});

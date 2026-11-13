@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeftIcon, PlusIcon } from "lucide-react";
+import { ArrowLeftIcon, NotebookTextIcon, PlusIcon } from "lucide-react";
 import { FormAlert } from "@/components/form-alert";
+import { ScrollToHash } from "@/components/scroll-to-hash";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageContainer } from "@/components/layout/page-container";
@@ -142,6 +143,22 @@ async function HouseholdContent({
       </Section>
 
       <Section
+        title="Journal"
+        description="A shared record of what's happened here: expenses added or changed, payments recorded, and people joining or leaving."
+      >
+        <div>
+          <Button variant="outline" asChild>
+            <Link href={`/households/${household.id}/journal`}>
+              <NotebookTextIcon aria-hidden="true" data-icon="inline-start" />
+              View journal
+            </Link>
+          </Button>
+        </div>
+      </Section>
+
+      <Section
+        id="members"
+        className="scroll-mt-20"
         title="Members"
         description={
           members.length === 1
@@ -153,6 +170,8 @@ async function HouseholdContent({
       </Section>
 
       <Section
+        id="invite-links"
+        className="scroll-mt-20"
         title="Invite someone"
         description="Anyone with a link can join after signing in, until it expires or runs out of uses. Share it only with people you live with."
       >
@@ -161,6 +180,8 @@ async function HouseholdContent({
       </Section>
 
       <MembershipSection household={household} memberCount={members.length} />
+      {/* The journal links to #members and #invite-links. */}
+      <ScrollToHash />
     </div>
   );
 }

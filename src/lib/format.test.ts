@@ -3,7 +3,10 @@ import {
   currencyExponent,
   formatDate,
   formatDateTime,
+  formatLongDate,
   formatMoney,
+  formatTime,
+  formatWeekdayTime,
   minorToDecimalString,
 } from "./format";
 
@@ -61,5 +64,26 @@ describe("formatDateTime", () => {
     expect(formatDateTime("2026-11-01T18:45:00Z", "Asia/Kolkata")).toBe(
       "2 Nov 2026, 12:15 am",
     );
+  });
+});
+
+describe("formatTime and formatWeekdayTime", () => {
+  it("render the time of day, and the weekday, in the given timezone", () => {
+    // 18:45 UTC on Sunday 1 Nov is 00:15 on Monday 2 Nov in India.
+    expect(formatTime("2026-11-01T18:45:00Z", "Asia/Kolkata")).toBe("12:15 am");
+    expect(formatWeekdayTime("2026-11-01T18:45:00Z", "Asia/Kolkata")).toBe(
+      "Mon, 12:15 am",
+    );
+    expect(formatTime("2026-11-01T18:45:00Z", "UTC")).toBe("6:45 pm");
+    expect(formatWeekdayTime(new Date("2026-11-01T18:45:00Z"), "UTC")).toBe(
+      "Sun, 6:45 pm",
+    );
+  });
+});
+
+describe("formatLongDate", () => {
+  it("formats a calendar date with its weekday, without timezone shift", () => {
+    expect(formatLongDate("2026-11-06")).toBe("Friday, 6 November 2026");
+    expect(formatLongDate("2027-01-01")).toBe("Friday, 1 January 2027");
   });
 });

@@ -79,6 +79,8 @@ Typography roles are `type-*` utilities. They are deliberately not named `text-*
 - **Balances** use the sign convention in [money.md](money.md#balances): positive is owed, negative owes. In running text, `formatBalance` keeps the sign and the amount on one line. Rows that pair a name with large amounts must wrap, not overlap, on a 320px screen.
 - `formatDate("YYYY-MM-DD")` formats a calendar date without shifting it across timezones.
 - `formatDateTime(instant, timeZone)` formats an instant in the household's timezone (decision D11).
+- `formatTime` ("10:30 am"), `formatWeekdayTime` ("Fri, 10:30 am") and `formatLongDate`
+  ("Friday, 6 November 2026", a calendar date) were added for the journal's day headings (Phase 13).
 
 ## Spacing, layout and breakpoints
 
@@ -100,7 +102,7 @@ Built in Phase 3 (after Phase 6). Signed-in pages (`src/app/(app)/layout.tsx`) g
 | ≥ 1024px (`lg`) | Sticky 256px sidebar: logo, household switcher, main nav, and account (name → Profile, Sign out) at the foot.                  |
 | < 1024px        | Sticky top bar (logo, household switcher) and a fixed bottom tab bar with icon + text labels. Sign out is on the Profile page. |
 
-- **Main nav** ([src/lib/navigation.ts](../src/lib/navigation.ts), unit-tested): Home; then Household, Expenses and Balances (only inside one of your households); then Profile. Only routes that exist are listed (D23); each feature phase adds its entry with its pages. The bottom bar fits five labelled tabs at 360px (checked in `e2e/balances.spec.ts`), so settlements (roadmap Phase 10) have no tab of their own: Balances stays active on `/settlements` pages (`alsoMatches`).
+- **Main nav** ([src/lib/navigation.ts](../src/lib/navigation.ts), unit-tested): Home; then Household, Expenses and Balances (only inside one of your households); then Profile. Only routes that exist are listed (D23); each feature phase adds its entry with its pages. The bottom bar fits five labelled tabs at 360px (checked in `e2e/balances.spec.ts`), so settlements (roadmap Phase 10) have no tab of their own: Balances stays active on `/settlements` pages (`alsoMatches`). The same goes for the journal (roadmap Phase 13), under Household, which links to it.
 - **Active item:** `aria-current="page"`, a heavier weight and an indicator bar, so it never relies on colour alone.
 - **Household switcher** ([src/components/shell/household-switcher.tsx](../src/components/shell/household-switcher.tsx)): the current household is read from the URL (`/households/[householdId]`) and is shown only if it's one of yours. Switching is plain navigation, so each page loads its own data on the server. Nothing is stored in the browser.
 - **Fresh after changes:** actions that change your list of households (create, join, leave, delete) call `revalidatePath("/", "layout")` before redirecting.
@@ -136,7 +138,7 @@ Built in Phase 3 (after Phase 6). Signed-in pages (`src/app/(app)/layout.tsx`) g
 - `BalanceBadge` and `BalanceAmount` ([src/components/balance.tsx](../src/components/balance.tsx)): a balance's direction as an icon and a word ("Owed", "Owes", "Settled up"), and the signed amount toned to match. The direction is always in words too, and the sign is always shown, so colour is never the only signal.
 - `EmptyState`: icon, title, description and a "next step" action.
 - `ErrorState`: an alert that explains what happened and what to do next, with an optional recovery action.
-- `SettlementNotice` ([src/components/settlement-notice.tsx](../src/components/settlement-notice.tsx)): D9's "Recorded in the app — no money is moved." with an icon, and optional context after it. Every settlement surface shows it: the history, the form and its review step, a payment's page, and the settlement parts of the balances pages.
+- `SettlementNotice` ([src/components/settlement-notice.tsx](../src/components/settlement-notice.tsx)): D9's "Recorded in the app — no money is moved." with an icon, and optional context after it. Every settlement surface shows it: the history, the form and its review step, a payment's page, the settlement parts of the balances pages, and the journal whenever it shows payments.
 - `FormAlert` tones: `error`, `success`, `info` and `warning` (roadmap Phase 10, for D9's "more than what's owed"). The expense history (Phase 12) uses `success` after a delete and `info` for a page past the end. The `warning` tone uses the `Alert` `warning` variant: `warning` text on `warning-subtle`, a pair `tokens.test.ts` already checks, with a triangle icon so it never relies on colour.
 
 **Settlement wording** ([src/lib/settlements/wording.ts](../src/lib/settlements/wording.ts), unit-tested): "Record a payment", "Payment from Pat to Olive", D9's "Pat recorded a payment of ₹300.00 to Olive.", statuses "Recorded" and "Voided" (icon and word). Never "sent", "transferred" or anything suggesting the app moved or checked money. Recording has a review step that shows who paid whom, the amount and currency, the date and the note, says what the record does to the balances, and that the app can't check the payment happened.
@@ -176,6 +178,27 @@ Every control has default, hover, `focus-visible` (solid 3px ring) and disabled 
   (each with an `aria-label`). At either end they're disabled buttons, not links.
 - **Invalid filters** are marked on their fields, the filters open, and no results are shown until
   they're fixed. An empty result says so and offers "Clear all filters".
+
+**Timeline** (the household journal, roadmap Phase 13; [journal.md](journal.md))
+
+- **Days as sections.** Each day heading ("Today", "Yesterday", "Earlier this week", then
+  "Friday, 6 November 2026") is an `h2` labelling a `section` with an ordered list, newest first,
+  in the household's timezone.
+- **An entry** is an icon on a tinted circle (hidden from screen readers), a sentence saying who did
+  what, what it was about, what changed (old `→` new; screen readers hear "to"), then a `<time>`, the
+  kind in words (Expense, Payment, Household) and a link. The tints are tested token pairs
+  (`info`/`info-subtle`, `secondary-foreground`/`secondary`, `highlight-foreground`/`highlight-subtle`)
+  and never the only signal.
+- **Links say what they open,** with the record in their accessible name when several would sound
+  alike ("View expense: Groceries"). An accessible name always starts with the visible words
+  (WCAG 2.5.3).
+- **Filters are links** with `aria-current`, a check icon and a heavier weight. "Show older activity"
+  and "Back to the latest" are links too, so every view has its own URL.
+- **Links to a part of a streamed page** (`/households/[id]#members`) need `ScrollToHash`
+  ([src/components/scroll-to-hash.tsx](../src/components/scroll-to-hash.tsx)) inside the streamed
+  content: Next.js scrolls to a fragment when the navigation commits, before a Suspense boundary has
+  rendered the target (caught by `e2e/journal.spec.ts` on a phone). The target `section` gets
+  `scroll-mt-20` so the sticky top bar doesn't cover its heading.
 
 **Destructive actions**
 
