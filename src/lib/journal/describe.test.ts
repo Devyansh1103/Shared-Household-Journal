@@ -721,6 +721,87 @@ describe("shopping and chore entries (roadmap Phase 15)", () => {
   });
 });
 
+describe("budget entries (roadmap Phase 16)", () => {
+  const BUDGET = "abababab-abab-4bab-8bab-abababababab";
+  const active: JournalEntity = {
+    available: true,
+    id: BUDGET,
+    state: "active",
+  };
+
+  it("say who set a budget, what for, how much and from when", () => {
+    expect(
+      describeForPat(
+        entry(
+          {
+            type: "budget_created",
+            budget: { category: "groceries", period: "month" },
+            limitMinor: BigInt(800000),
+            startsOn: "2026-11-01",
+          },
+          { entity: active },
+        ),
+      ),
+    ).toEqual({
+      category: "budgets",
+      categoryLabel: "Budget",
+      title: "Olive set a monthly budget for groceries",
+      summary: "₹8,000.00 a month",
+      context: ["From November 2026"],
+      changes: [],
+      link: {
+        href: `/households/${HOUSEHOLD}/budgets`,
+        label: "View budgets",
+        accessibleLabel: "View budgets",
+      },
+      unavailable: false,
+    });
+  });
+
+  it("list a new limit, old and new, and when it applies from", () => {
+    const d = describeForPat(
+      entry(
+        {
+          type: "budget_updated",
+          budget: { category: null, period: "week" },
+          beforeLimitMinor: BigInt(500000),
+          afterLimitMinor: BigInt(600000),
+          fromOn: "2026-11-09",
+        },
+        { actorId: PAT, entity: active },
+      ),
+    );
+    expect(d).toMatchObject({
+      title: "You changed the weekly budget for everything",
+      summary: "₹6,000.00 a week",
+      context: ["From 9–15 Nov 2026; earlier ones keep their limit"],
+      changes: [
+        { kind: "value", label: "Limit", from: "₹5,000.00", to: "₹6,000.00" },
+      ],
+      link: { href: `/households/${HOUSEHOLD}/budgets?period=week` },
+    });
+  });
+
+  it("say who removed one, without a link once it's gone", () => {
+    expect(
+      describeForPat(
+        entry(
+          {
+            type: "budget_archived",
+            budget: { category: "dining", period: "quarter" },
+            limitMinor: BigInt(300000),
+          },
+          { entity: { available: true, id: BUDGET, state: "archived" } },
+        ),
+      ),
+    ).toMatchObject({
+      title: "Olive removed the quarterly budget for dining",
+      summary: "Was ₹3,000.00 a quarter",
+      link: null,
+    });
+  });
+});
+
 describe("every entry", () => {
   const all: JournalEntry[] = [
     entry(

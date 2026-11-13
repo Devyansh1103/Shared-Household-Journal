@@ -83,6 +83,7 @@ describe("parseJournalQuery", () => {
       "bills",
       "shopping",
       "chores",
+      "budgets",
       "household",
     ] as const) {
       expect(parseJournalQuery({ show, before: `${US}.${EVENT}` })).toEqual({
@@ -93,7 +94,7 @@ describe("parseJournalQuery", () => {
   });
 
   it("reports an unknown filter or a bad cursor instead of guessing", () => {
-    for (const show of ["Expenses", "budgets", "Chores", "expenses ", "0"]) {
+    for (const show of ["Expenses", "analytics", "Chores", "expenses ", "0"]) {
       expect(parseJournalQuery({ show, before: "" })).toEqual({
         ok: false,
         problem: "filter",

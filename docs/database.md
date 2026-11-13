@@ -395,6 +395,18 @@ loaded, `HJ030` the assignee isn't an active member.
 Tests: [supabase/tests/shopping-chores.test.ts](../supabase/tests/shopping-chores.test.ts) and the
 unit tests in [src/lib/shopping/](../src/lib/shopping/) and [src/lib/chores/](../src/lib/chores/).
 
+## Budgets and analytics (roadmap Phase 16)
+
+Migrations `20261119120000_budget_types.sql` (the `budget_period` enum, three journal event types
+and the `budget` entity type) and `20261119120100_budgets_and_analytics.sql`: tables `budgets` and
+`budget_limits`, the write functions `create_budget`, `update_budget` and `archive_budget` (any
+active member, O3; journalled), and the reads `household_budgets` and `household_analytics`
+(`security invoker`, one snapshot, every sum in Postgres). `household_journal` is replaced again,
+same signature and grants, with a `budgets` filter. Error codes: `HJ031` no such budget, `HJ032`
+already a budget for that category and period; `HJ028` and `HJ029` reused. The rules, the tables,
+the functions and rolling back: [budgets.md](budgets.md#database). Tests:
+[supabase/tests/budgets.test.ts](../supabase/tests/budgets.test.ts).
+
 ## Access control
 
 RLS is enabled on every table, with deny by default. Policies apply to `authenticated` only. `anon` has
@@ -422,6 +434,7 @@ Helpers live in the `private` schema, which the Data API does not expose. All ar
 | `recurring_bills`, `recurring_bill_shares` | Active members                                               | No (`create_recurring_bill`)                                                | No (the bill functions)                                                 | No     |
 | `bill_occurrences`                         | Active members                                               | No (the bill functions)                                                     | No (skip and un-skip only; the trigger refuses anything else)           | No     |
 | `shopping_items`, `chores`                 | Active members (removed ones too)                            | No (`add_shopping_item`, `create_chore`)                                    | No (the shopping and chore functions)                                   | No     |
+| `budgets`, `budget_limits`                 | Active members (removed budgets too)                         | No (`create_budget`)                                                        | No (`update_budget`, `archive_budget`)                                  | No     |
 
 "No" means there is no policy **and** no table privilege, so the request fails with `42501`.
 Column-level grants stop an allowed row update from also changing ids, creators or counters.

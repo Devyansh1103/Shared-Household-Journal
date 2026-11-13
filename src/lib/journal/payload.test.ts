@@ -57,6 +57,7 @@ const billDetail = {
 const ITEM = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 const shoppingDetail = { name: "Milk", quantity: "1 litre", assignee_id: PAT };
 const CHORE = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const BUDGET = "abababab-abab-4bab-8bab-abababababab";
 const choreDetail = {
   title: "Take out the bins",
   assignee_id: PAT,
@@ -110,6 +111,24 @@ const DETAILS: Record<JournalEntryType, unknown> = {
   chore_completed: { title: "Take out the bins" },
   chore_reopened: { title: "Take out the bins" },
   chore_removed: { title: "Take out the bins" },
+  budget_created: {
+    category: "groceries",
+    period: "month",
+    limit_minor: "800000",
+    starts_on: "2026-11-01",
+  },
+  budget_updated: {
+    category: null,
+    period: "week",
+    before_limit_minor: "500000",
+    after_limit_minor: "600000",
+    from_on: "2026-11-09",
+  },
+  budget_archived: {
+    category: "dining",
+    period: "quarter",
+    limit_minor: "300000",
+  },
 };
 
 function entityFor(type: JournalEntryType) {
@@ -128,6 +147,9 @@ function entityFor(type: JournalEntryType) {
   }
   if (category === "chores") {
     return { available: true, id: CHORE, state: "completed" };
+  }
+  if (category === "budgets") {
+    return { available: true, id: BUDGET, state: "archived" };
   }
   return null;
 }
@@ -269,7 +291,7 @@ describe("parseJournalPayload", () => {
   it("refuses unknown types, wrong shapes and impossible values", () => {
     const [created] = rowsOf(["expense_created"]);
     const bad: RawRow[] = [
-      { ...created, type: "budget_created" },
+      { ...created, type: "analytics_viewed" },
       { ...created, type: "chore_completed" },
       { ...created, type: "settlement_recorded" },
       { ...created, detail: { ...expenseDetail, amount_minor: "0" } },
@@ -317,7 +339,58 @@ describe("entryCategory", () => {
       ...Array(7).fill("bills"),
       ...Array(5).fill("shopping"),
       ...Array(5).fill("chores"),
+      ...Array(3).fill("budgets"),
     ]);
+  });
+});
+
+describe("budget entries (roadmap Phase 16)", () => {
+  it("reads them, with limits as BigInt and null for everything", () => {
+    const page = parsed(
+      rowsOf(["budget_created", "budget_updated", "budget_archived"]),
+    );
+    expect(page.entries.map((e) => e.detail)).toEqual([
+      {
+        type: "budget_created",
+        budget: { category: "groceries", period: "month" },
+        limitMinor: BigInt(800000),
+        startsOn: "2026-11-01",
+      },
+      {
+        type: "budget_updated",
+        budget: { category: null, period: "week" },
+        beforeLimitMinor: BigInt(500000),
+        afterLimitMinor: BigInt(600000),
+        fromOn: "2026-11-09",
+      },
+      {
+        type: "budget_archived",
+        budget: { category: "dining", period: "quarter" },
+        limitMinor: BigInt(300000),
+      },
+    ]);
+  });
+
+  it("refuses an unknown period, a zero limit or a state budgets can't be in", () => {
+    const [created] = rowsOf(["budget_created"]);
+    for (const detail of [
+      { ...(DETAILS.budget_created as object), period: "year" },
+      { ...(DETAILS.budget_created as object), limit_minor: "0" },
+      { ...(DETAILS.budget_created as object), note: "x" },
+    ]) {
+      expect(parseJournalPayload(payload([{ ...created, detail }]))).toBeNull();
+    }
+    expect(
+      checkJournal(
+        parsed([
+          {
+            ...created,
+            entity: { available: true, id: BUDGET, state: "removed" },
+          },
+        ]),
+        { householdId: HOUSEHOLD, filter: "all", before: null, pageSize: 25 },
+      ),
+    ).toEqual({ ok: false, code: "entity_mismatch" });
   });
 });
 

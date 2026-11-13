@@ -17,6 +17,7 @@ import {
   LogOutIcon,
   NotebookTextIcon,
   PencilIcon,
+  PiggyBankIcon,
   ReceiptIcon,
   RotateCcwIcon,
   SearchXIcon,
@@ -88,6 +89,9 @@ const ICONS: Record<JournalEntryType, LucideIcon> = {
   chore_completed: CircleCheckIcon,
   chore_reopened: Undo2Icon,
   chore_removed: Trash2Icon,
+  budget_created: PiggyBankIcon,
+  budget_updated: PencilIcon,
+  budget_archived: Trash2Icon,
 };
 
 /** Token pairs checked by tokens.test.ts; the category is also said in words. */
@@ -97,6 +101,7 @@ const TONES: Record<JournalCategory, string> = {
   bills: "bg-muted text-muted-foreground",
   shopping: "bg-success-subtle text-success",
   chores: "bg-accent text-accent-foreground",
+  budgets: "bg-warning-subtle text-warning",
   household: "bg-highlight-subtle text-highlight-foreground",
 };
 
@@ -125,6 +130,11 @@ const EMPTY: Record<JournalCategory, { title: string; description: string }> = {
     description:
       "When someone adds, changes, completes or removes a chore, it will appear here.",
   },
+  budgets: {
+    title: "No budget activity yet",
+    description:
+      "When someone sets, changes or removes a budget, it will appear here.",
+  },
   household: {
     title: "No household activity yet",
     description:
@@ -138,6 +148,7 @@ const UNAVAILABLE: Record<JournalCategory, string> = {
   bills: "This bill is no longer available.",
   shopping: "This item is no longer available.",
   chores: "This chore is no longer available.",
+  budgets: "This budget is no longer available.",
   household: "This is no longer available.",
 };
 
@@ -149,6 +160,7 @@ const END: Record<JournalQuery["filter"], string> = {
   bills: "That's all the bill activity.",
   shopping: "That's all the shopping list activity.",
   chores: "That's all the chore activity.",
+  budgets: "That's all the budget activity.",
   household: "That's all the household activity.",
 };
 

@@ -234,6 +234,23 @@ Every control has default, hover, `focus-visible` (solid 3px ring) and disabled 
 - **Journal tints:** Shopping is `success`/`success-subtle`, Chores `accent-foreground`/`accent`,
   both pairs `tokens.test.ts` checks.
 
+**Budgets and analytics** (roadmap Phase 16; [budgets.md](budgets.md))
+
+- **Budget cards:** what it covers (`h3`) and its period, the status as a `StatusBadge` (Nothing
+  spent yet neutral, On track success, Near limit warning, Over budget danger), "₹7,000.00 spent of
+  ₹8,000.00", a bar, then "87.5% used · ₹1,000.00 left" or "₹4,000.00 over the limit" in words. The
+  bar is `aria-hidden` (`bg-primary` on `bg-muted`, `bg-warning-fill` near the limit, `bg-destructive`
+  over it) and never the only signal.
+- **Charts are tables:** each row is a label (`th`), a decorative bar and the figures, so screen
+  readers get the same numbers; the bar sits under the label on a phone. A table wider than the screen
+  scrolls inside a focusable, labelled region (`tabIndex={0}`, `role="region"`), so it can be
+  scrolled by keyboard (axe `scrollable-region-focusable`). No chart library.
+- **Periods:** chips for Weekly, Monthly and Quarterly, then Previous and Next (Next disabled at the
+  current period) with the period in words ("November 2026 (this month)").
+- **Paid against share** is two labelled columns with an explanation, never one "spending per
+  person" figure.
+- **Journal tint:** Budgets is `warning`/`warning-subtle`, a pair `tokens.test.ts` checks.
+
 **Forms keep what was submitted.** React resets a form's fields after its action, even when the
 action comes back with errors. Text inputs come back from the submitted values, but a select goes
 back to its first default and a Radix checkbox to its first tick, silently: a changed payer or an

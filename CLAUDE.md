@@ -16,6 +16,7 @@ Records shared household expenses and home coordination. **The app never moves m
 - [docs/journal.md](docs/journal.md): the household journal: which events are shown and how, consistency and visibility, pages and privacy
 - [docs/bills.md](docs/bills.md): recurring bills: the schedule rules, periods without a scheduler, recording, the lifecycle, reminders (in-app only)
 - [docs/shopping-chores.md](docs/shopping-chores.md): the shared shopping list and one-off chores: fields, filters, who may do what (D28), people who leave, the journal
+- [docs/budgets.md](docs/budgets.md): budgets and analytics: what counts as spending, periods, limits over time, the figures and statuses, paid against share, the database reads
 
 ## Commands (npm only)
 

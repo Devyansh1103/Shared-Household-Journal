@@ -18,6 +18,7 @@ import {
   listMembers,
 } from "@/lib/households/queries";
 import { BillsReminder, BillsReminderSkeleton } from "./bills-reminder";
+import { BudgetsSummary } from "./budgets-summary";
 import { ChoresSummary, ShoppingSummary, SummarySkeleton } from "./home-tasks";
 import { InvitePanel } from "./invite-panel";
 import { InvitationList } from "./invitation-list";
@@ -150,6 +151,15 @@ async function HouseholdContent({
       >
         <Suspense fallback={<BillsReminderSkeleton />}>
           <BillsReminder householdId={household.id} />
+        </Suspense>
+      </Section>
+
+      <Section
+        title="Budgets and spending"
+        description="Monthly, weekly or quarterly limits against what's recorded, and where the money goes."
+      >
+        <Suspense fallback={<SummarySkeleton label="Loading budgets" />}>
+          <BudgetsSummary household={household} />
         </Suspense>
       </Section>
 

@@ -107,6 +107,117 @@ export type Database = {
           },
         ];
       };
+      budget_limits: {
+        Row: {
+          budget_id: string;
+          household_id: string;
+          limit_minor: number;
+          set_at: string;
+          set_by: string;
+          starts_on: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          budget_id: string;
+          household_id: string;
+          limit_minor: number;
+          set_at?: string;
+          set_by: string;
+          starts_on: string;
+        };
+        Update: {
+          budget_id?: string;
+          household_id?: string;
+          limit_minor?: number;
+          set_at?: string;
+          set_by?: string;
+          starts_on?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "budget_limits_budget_fkey";
+            columns: ["budget_id", "household_id"];
+            isOneToOne: false;
+            referencedRelation: "budgets";
+            referencedColumns: ["id", "household_id"];
+          },
+          {
+            foreignKeyName: "budget_limits_set_by_fkey";
+            columns: ["set_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      budgets: {
+        Row: {
+          archived_at: string | null;
+          archived_by: string | null;
+          archived_on: string | null;
+          category: Database["public"]["Enums"]["expense_category"] | null;
+          created_at: string;
+          created_by: string;
+          creation_key: string | null;
+          household_id: string;
+          id: string;
+          period: Database["public"]["Enums"]["budget_period"];
+          starts_on: string;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          archived_at?: string | null;
+          archived_by?: string | null;
+          archived_on?: string | null;
+          category?: Database["public"]["Enums"]["expense_category"] | null;
+          created_at?: string;
+          created_by: string;
+          creation_key?: string | null;
+          household_id: string;
+          id?: string;
+          period: Database["public"]["Enums"]["budget_period"];
+          starts_on: string;
+          updated_at?: string;
+        };
+        Update: {
+          archived_at?: string | null;
+          archived_by?: string | null;
+          archived_on?: string | null;
+          category?: Database["public"]["Enums"]["expense_category"] | null;
+          created_at?: string;
+          created_by?: string;
+          creation_key?: string | null;
+          household_id?: string;
+          id?: string;
+          period?: Database["public"]["Enums"]["budget_period"];
+          starts_on?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "budgets_archived_by_fkey";
+            columns: ["archived_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "budgets_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "budgets_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       chores: {
         Row: {
           assignee_id: string | null;
@@ -826,7 +937,21 @@ export type Database = {
         };
         Returns: string;
       };
+      archive_budget: {
+        Args: { target_budget_id: string };
+        Returns: undefined;
+      };
       complete_chore: { Args: { target_chore_id: string }; Returns: undefined };
+      create_budget: {
+        Args: {
+          budget_category?: Database["public"]["Enums"]["expense_category"];
+          budget_kind: Database["public"]["Enums"]["budget_period"];
+          budget_limit: number;
+          request_key?: string;
+          target_household_id: string;
+        };
+        Returns: string;
+      };
       create_chore: {
         Args: {
           chore_assignee_id?: string;
@@ -919,11 +1044,31 @@ export type Database = {
           status: string;
         }[];
       };
+      household_analytics: {
+        Args: {
+          category_filter?: Database["public"]["Enums"]["expense_category"];
+          compare_from?: string;
+          compare_to?: string;
+          date_from: string;
+          date_to: string;
+          payer_filter?: string;
+          target_household_id: string;
+        };
+        Returns: Json;
+      };
       household_balances: {
         Args: { focus_user_id?: string; target_household_id: string };
         Returns: Json;
       };
       household_bills: { Args: { target_household_id: string }; Returns: Json };
+      household_budgets: {
+        Args: {
+          budget_kind: Database["public"]["Enums"]["budget_period"];
+          on_date?: string;
+          target_household_id: string;
+        };
+        Returns: Json;
+      };
       household_journal: {
         Args: {
           before_id?: string;
@@ -1019,6 +1164,14 @@ export type Database = {
         Args: { occurrence_due_on: string; target_bill_id: string };
         Returns: undefined;
       };
+      update_budget: {
+        Args: {
+          budget_limit: number;
+          expected_updated_at?: string;
+          target_budget_id: string;
+        };
+        Returns: undefined;
+      };
       update_chore: {
         Args: {
           chore_assignee_id?: string;
@@ -1085,7 +1238,8 @@ export type Database = {
         | "settlement"
         | "recurring_bill"
         | "shopping_item"
-        | "chore";
+        | "chore"
+        | "budget";
       activity_event_type:
         | "household_created"
         | "member_joined"
@@ -1116,8 +1270,12 @@ export type Database = {
         | "chore_updated"
         | "chore_completed"
         | "chore_reopened"
-        | "chore_removed";
+        | "chore_removed"
+        | "budget_created"
+        | "budget_updated"
+        | "budget_archived";
       bill_frequency: "week" | "month" | "year";
+      budget_period: "week" | "month" | "quarter";
       chore_priority: "low" | "medium" | "high";
       expense_category:
         | "rent"
@@ -1266,6 +1424,7 @@ export const Constants = {
         "recurring_bill",
         "shopping_item",
         "chore",
+        "budget",
       ],
       activity_event_type: [
         "household_created",
@@ -1298,8 +1457,12 @@ export const Constants = {
         "chore_completed",
         "chore_reopened",
         "chore_removed",
+        "budget_created",
+        "budget_updated",
+        "budget_archived",
       ],
       bill_frequency: ["week", "month", "year"],
+      budget_period: ["week", "month", "quarter"],
       chore_priority: ["low", "medium", "high"],
       expense_category: [
         "rent",

@@ -54,6 +54,9 @@ export const ENTRY_CATEGORIES = {
   chore_completed: "chores",
   chore_reopened: "chores",
   chore_removed: "chores",
+  budget_created: "budgets",
+  budget_updated: "budgets",
+  budget_archived: "budgets",
 } as const satisfies Record<EventType, JournalCategory>;
 
 export type JournalEntryType = keyof typeof ENTRY_CATEGORIES;
@@ -127,6 +130,10 @@ const choreSchema = z.strictObject({
   priority: z.enum(["low", "medium", "high"]),
 });
 const choreTitleSchema = z.strictObject({ title: z.string() });
+const budgetKind = {
+  category: z.enum(CATEGORY_VALUES).nullable(),
+  period: z.enum(["week", "month", "quarter"]),
+};
 const billPeriodSchema = z.strictObject({
   description: z.string(),
   due_on: z.iso.date(),
@@ -178,6 +185,18 @@ const detailSchemas = {
   chore_completed: choreTitleSchema,
   chore_reopened: choreTitleSchema,
   chore_removed: choreTitleSchema,
+  budget_created: z.strictObject({
+    ...budgetKind,
+    limit_minor: amount,
+    starts_on: z.iso.date(),
+  }),
+  budget_updated: z.strictObject({
+    ...budgetKind,
+    before_limit_minor: amount,
+    after_limit_minor: amount,
+    from_on: z.iso.date(),
+  }),
+  budget_archived: z.strictObject({ ...budgetKind, limit_minor: amount }),
 } satisfies Record<JournalEntryType, z.ZodType>;
 
 const ENTITY_STATE_VALUES = [
@@ -189,6 +208,7 @@ const ENTITY_STATE_VALUES = [
   "purchased",
   "completed",
   "removed",
+  "archived",
 ] as const;
 
 const entitySchema = z
@@ -306,7 +326,28 @@ export type JournalDetail =
   | {
       type: "chore_completed" | "chore_reopened" | "chore_removed";
       title: string;
-    };
+    }
+  | {
+      type: "budget_created";
+      budget: BudgetKind;
+      limitMinor: bigint;
+      startsOn: string;
+    }
+  | {
+      type: "budget_updated";
+      budget: BudgetKind;
+      beforeLimitMinor: bigint;
+      afterLimitMinor: bigint;
+      /** The first day of the first period with the new limit. */
+      fromOn: string;
+    }
+  | { type: "budget_archived"; budget: BudgetKind; limitMinor: bigint };
+
+export type BudgetKind = {
+  /** Null: everything the household spends. */
+  category: ExpenseCategory | null;
+  period: "week" | "month" | "quarter";
+};
 
 export type ShoppingItemFields = {
   name: string;
@@ -570,6 +611,39 @@ function parseDetail(
       const d = detailSchemas[type].safeParse(detail);
       return d.success ? { type, title: d.data.title } : null;
     }
+    case "budget_created": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success
+        ? {
+            type,
+            budget: { category: d.data.category, period: d.data.period },
+            limitMinor: d.data.limit_minor,
+            startsOn: d.data.starts_on,
+          }
+        : null;
+    }
+    case "budget_updated": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success
+        ? {
+            type,
+            budget: { category: d.data.category, period: d.data.period },
+            beforeLimitMinor: d.data.before_limit_minor,
+            afterLimitMinor: d.data.after_limit_minor,
+            fromOn: d.data.from_on,
+          }
+        : null;
+    }
+    case "budget_archived": {
+      const d = detailSchemas[type].safeParse(detail);
+      return d.success
+        ? {
+            type,
+            budget: { category: d.data.category, period: d.data.period },
+            limitMinor: d.data.limit_minor,
+          }
+        : null;
+    }
   }
 }
 
@@ -656,6 +730,7 @@ const ENTITY_STATES: Record<
   bills: ["active", "paused", "ended"],
   shopping: ["active", "purchased", "removed"],
   chores: ["active", "completed", "removed"],
+  budgets: ["active", "archived"],
 };
 
 /** The record an entry may be about, and the states that record can be in. */

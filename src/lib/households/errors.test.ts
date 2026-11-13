@@ -45,6 +45,11 @@ describe("householdErrorMessage", () => {
     expect(householdErrorMessage("HJ027")).toMatch(/chore/);
   });
 
+  it("explains the budget codes in plain words (roadmap Phase 16)", () => {
+    expect(householdErrorMessage("HJ031")).toMatch(/budget/);
+    expect(householdErrorMessage("HJ032")).toMatch(/already a budget/);
+  });
+
   it("falls back to a generic message for unknown or missing codes", () => {
     expect(householdErrorMessage("XX999")).toBe(GENERIC_ERROR);
     expect(householdErrorMessage(undefined)).toBe(GENERIC_ERROR);

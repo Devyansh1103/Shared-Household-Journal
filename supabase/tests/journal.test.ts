@@ -1185,7 +1185,7 @@ describe("ties and cursors", () => {
   it("refuses input that can't be right", async () => {
     const id = randomUUID();
     const bad: Record<string, unknown>[] = [
-      { category_filter: "budgets" },
+      { category_filter: "analytics" },
       { category_filter: "Chores" },
       { category_filter: "" },
       { page_size: 0 },

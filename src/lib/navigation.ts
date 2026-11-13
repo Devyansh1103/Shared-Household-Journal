@@ -13,8 +13,8 @@ export type NavItem = {
   /**
    * Other sections that belong to this item, active with their sub-paths:
    * settlements are reached from Balances, and the journal, bills, shopping
-   * list and chores from Household, because the bottom bar has no room for a
-   * sixth tab at 360px.
+   * list, chores, budgets and analytics from Household, because the bottom
+   * bar has no room for a sixth tab at 360px.
    */
   alsoMatches?: string[];
 };
@@ -37,6 +37,8 @@ export function navItems(currentHouseholdId?: string | null): NavItem[] {
           `${base}/bills`,
           `${base}/shopping`,
           `${base}/chores`,
+          `${base}/budgets`,
+          `${base}/analytics`,
         ],
       },
       {

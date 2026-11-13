@@ -344,7 +344,7 @@ test("empty filters, invalid links and non-members", async ({ page }) => {
     .poll(() => titles(page))
     .toEqual([`You created the household “${home.name}”`]);
 
-  await page.goto(`/households/${home.id}/journal?show=budgets`);
+  await page.goto(`/households/${home.id}/journal?show=analytics`);
   await expect(
     page.getByText(
       /That link asks for a part of the journal that doesn't exist/,

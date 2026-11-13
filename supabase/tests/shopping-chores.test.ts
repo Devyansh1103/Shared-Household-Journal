@@ -852,7 +852,7 @@ describe("the journal", () => {
   it("still refuses a category it doesn't know", async () => {
     const { error } = await olive.client.rpc("household_journal", {
       target_household_id: H,
-      category_filter: "budgets",
+      category_filter: "analytics",
     });
     expectError(error, "22023");
   });

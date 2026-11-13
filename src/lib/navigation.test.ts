@@ -71,6 +71,13 @@ describe("isActive", () => {
     expect(at(`/households/${HOUSEHOLD}/chores`)).toEqual(["household"]);
     expect(at(`/households/${HOUSEHOLD}/chores/new`)).toEqual(["household"]);
     expect(at(`/households/${HOUSEHOLD}/choresx`)).toEqual([]);
+    // And budgets and analytics (roadmap Phase 16).
+    expect(at(`/households/${HOUSEHOLD}/budgets`)).toEqual(["household"]);
+    expect(at(`/households/${HOUSEHOLD}/budgets/abc/edit`)).toEqual([
+      "household",
+    ]);
+    expect(at(`/households/${HOUSEHOLD}/analytics`)).toEqual(["household"]);
+    expect(at(`/households/${HOUSEHOLD}/analyticsx`)).toEqual([]);
     expect(at(`/households/${HOUSEHOLD}x`)).toEqual([]);
     expect(at("/households/new")).toEqual([]);
   });

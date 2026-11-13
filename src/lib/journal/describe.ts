@@ -8,12 +8,15 @@
 
 import type { Subject } from "@/lib/balances/explain";
 import { scheduleLabel } from "@/lib/bills/schedule";
+import { PERIOD_NOUNS, periodLabel } from "@/lib/budgets/period";
+import { budgetName } from "@/lib/budgets/words";
 import { categoryLabel } from "@/lib/expenses/categories";
 import { formatDate, formatMoney } from "@/lib/format";
 import { paymentTitle, recordedSentence } from "@/lib/settlements/wording";
 import {
   entryCategory,
   type BillFields,
+  type BudgetKind,
   type ChoreFields,
   type ExpenseChangeFields,
   type ShoppingItemFields,
@@ -75,6 +78,7 @@ const CATEGORY_LABELS: Record<JournalCategory, string> = {
   bills: "Bill",
   shopping: "Shopping",
   chores: "Chore",
+  budgets: "Budget",
   household: "Household",
 };
 
@@ -291,6 +295,22 @@ export function entryDescriber(
     }
     return changes;
   }
+
+  // A budget's page is the budgets page for its kind of period, while it's
+  // still active.
+  function budgetLink(
+    entity: JournalEntity | null,
+    budget: BudgetKind,
+  ): EntryLink | null {
+    if (!entity?.available || entity.state !== "active") return null;
+    return {
+      href: `${base}/budgets${budget.period === "month" ? "" : `?period=${budget.period}`}`,
+      label: "View budgets",
+      accessibleLabel: "View budgets",
+    };
+  }
+  const perPeriod = (minor: bigint, budget: BudgetKind) =>
+    `${money(minor)} a ${PERIOD_NOUNS[budget.period]}`;
 
   const schedule = (bill: BillFields) =>
     `${scheduleLabel(bill.frequency, bill.every)}, from ${formatDate(bill.anchorOn)}`;
@@ -645,6 +665,50 @@ export function entryDescriber(
         result.summary = detail.title;
         result.link = choresLink(entry.entity);
         break;
+      case "budget_created": {
+        const name = budgetName(
+          detail.budget.category,
+          detail.budget.period,
+        ).toLowerCase();
+        result.title = `${lead(actor)} set a ${name}`;
+        result.summary = perPeriod(detail.limitMinor, detail.budget);
+        result.context.push(
+          `From ${periodLabel(detail.startsOn, detail.budget.period)}`,
+        );
+        result.link = budgetLink(entry.entity, detail.budget);
+        break;
+      }
+      case "budget_updated": {
+        const name = budgetName(
+          detail.budget.category,
+          detail.budget.period,
+        ).toLowerCase();
+        result.title = `${lead(actor)} changed the ${name}`;
+        result.summary = perPeriod(detail.afterLimitMinor, detail.budget);
+        result.changes = [
+          {
+            kind: "value",
+            label: "Limit",
+            from: money(detail.beforeLimitMinor),
+            to: money(detail.afterLimitMinor),
+          },
+        ];
+        result.context.push(
+          `From ${periodLabel(detail.fromOn, detail.budget.period)}; earlier ones keep their limit`,
+        );
+        result.link = budgetLink(entry.entity, detail.budget);
+        break;
+      }
+      case "budget_archived": {
+        const name = budgetName(
+          detail.budget.category,
+          detail.budget.period,
+        ).toLowerCase();
+        result.title = `${lead(actor)} removed the ${name}`;
+        result.summary = `Was ${perPeriod(detail.limitMinor, detail.budget)}`;
+        result.link = budgetLink(entry.entity, detail.budget);
+        break;
+      }
     }
     return result;
   };
