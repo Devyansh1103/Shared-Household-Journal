@@ -1137,6 +1137,7 @@ export type Database = {
           status: string;
         }[];
       };
+      health_check: { Args: Record<PropertyKey, never>; Returns: boolean };
       household_analytics: {
         Args: {
           category_filter?: Database["public"]["Enums"]["expense_category"];

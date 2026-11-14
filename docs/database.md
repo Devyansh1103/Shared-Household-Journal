@@ -248,7 +248,8 @@ household with 5,000 expenses, and about 13 ms for the same call with RLS bypass
 is the RLS policy on `expenses` (`private.is_household_member(household_id)`), checked once per row.
 Typical households, with a few hundred expenses, take a few milliseconds. If households ever grow
 much larger, an equivalent set-based policy would remove that cost; that changes a security policy,
-so it needs the owner's approval (Phase 18 hardening).
+so it needed the owner's approval. The owner decided on 2026-11-14 (roadmap Phase 18) to leave the
+policies as they are, documented in [known-limitations.md](known-limitations.md#scale).
 
 Tests: [history.test.ts](../src/lib/expenses/history.test.ts) and
 [history-payload.test.ts](../src/lib/expenses/history-payload.test.ts) (the URL rules, dates,
@@ -420,11 +421,33 @@ for every event type and page was compared byte for byte before and after). The 
 [notifications.md](notifications.md#database). Tests:
 [supabase/tests/notifications.test.ts](../supabase/tests/notifications.test.ts).
 
+## Operations (roadmap Phase 18)
+
+Migration `20261121120000_operations.sql`: two functions and their grants; no tables, columns or
+data change.
+
+| Function                                    | Kind                                                    | Who may run it                                                               | What                                                                                                                                                                                                                                                                           |
+| ------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `public.health_check()`                     | `sql`, `stable`, `security invoker`, `search_path = ''` | `anon`, `authenticated`                                                      | Returns `true`, reading nothing. Behind `GET /api/health`. The only function a signed-out visitor may run.                                                                                                                                                                     |
+| `private.anonymise_account(target_user_id)` | `plpgsql`, `security definer`, `search_path = ''`       | `service_role` (and the owner, `postgres`); not exposed through the Data API | D14: sets the profile's name to "Former member" and clears its avatar, and deletes the person's own notifications and notification settings. `HJ033` if there's no such profile; `HJ034` if they're still an active member of any household. Running it again changes nothing. |
+
+The procedure around it (the sign-in removed first, with Supabase Auth's soft delete) is in
+[operations.md](operations.md#deleting-an-account-d14). New error codes (operator-facing only):
+`HJ033` no such account, `HJ034` still an active member of a household. Tests:
+[supabase/tests/operations.test.ts](../supabase/tests/operations.test.ts).
+
+Phase 18 also added regression tests for the whole catalog and an attack matrix across households
+([supabase/tests/authorization.test.ts](../supabase/tests/authorization.test.ts)): a new table
+without RLS, a view, a privilege beyond the known ones or a function without `search_path` fails
+them. Supabase's default privileges grant `anon` and `authenticated` everything on each new object
+in `public`, so each migration must revoke ([migrations.md](migrations.md#rules)).
+
 ## Access control
 
 RLS is enabled on every table, with deny by default. Policies apply to `authenticated` only. `anon` has
-no table privileges at all. `service_role` bypasses RLS and is for tests and future server-only
-admin tasks; it is never sent to the browser.
+no table privileges at all, and may run only `public.health_check()`. `service_role` bypasses RLS
+and is for tests and operators (account deletion, D14); the app never uses it and it is never sent
+to the browser.
 
 Helpers live in the `private` schema, which the Data API does not expose. All are `SECURITY DEFINER`,
 `stable`, with `search_path = ''`, and they look only at the caller's own membership:
@@ -466,5 +489,5 @@ Members who leave or are removed lose access immediately, because every check re
 - Nothing schedules anything (no cron, no job runner): bill periods don't need it (see above), and
   notifications don't either: they're written with their events, and what's due is worked out
   when it's shown (D30).
-- Notification retention is undecided (O2): nothing deletes them but deleting the household or the
-  account.
+- Notifications are kept until deleted (O2, decided 2026-11-14): nothing deletes them but deleting
+  the household or the account ([backup-recovery.md](backup-recovery.md#retention-o2)).

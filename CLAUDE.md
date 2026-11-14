@@ -18,6 +18,12 @@ Records shared household expenses and home coordination. **The app never moves m
 - [docs/shopping-chores.md](docs/shopping-chores.md): the shared shopping list and one-off chores: fields, filters, who may do what (D28), people who leave, the journal
 - [docs/budgets.md](docs/budgets.md): budgets and analytics: what counts as spending, periods, limits over time, the figures and statuses, paid against share, the database reads
 - [docs/notifications.md](docs/notifications.md): in-app notifications: who each event notifies (D30), how they're made with their events, the notification centre, Needs attention, the settings, security
+- [docs/security.md](docs/security.md): the Phase 18 security audit: findings by severity, what was fixed, what was checked, remaining risks
+- [docs/production-readiness.md](docs/production-readiness.md): the release checklist with evidence (Verified / Failed / Not tested / N/A)
+- [docs/known-limitations.md](docs/known-limitations.md): what the first release doesn't do, and accepted trade-offs
+- [docs/testing.md](docs/testing.md): the test layers, quality gates, the e2e workflows and how to write tests
+- [docs/deployment.md](docs/deployment.md), [docs/environment.md](docs/environment.md), [docs/migrations.md](docs/migrations.md): deploying to Vercel and hosted Supabase (O1), the environment variables and their checks, releasing migrations
+- [docs/operations.md](docs/operations.md), [docs/backup-recovery.md](docs/backup-recovery.md): the health check, logs, monitoring, account deletion (D14) runbook; backups, restores and retention (O2)
 
 ## Commands (npm only)
 

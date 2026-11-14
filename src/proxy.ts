@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { RETURN_PATH_HEADER } from "@/lib/auth/return-path";
-import { supabaseConfig } from "@/lib/supabase/config";
+import { AUTH_COOKIE_OPTIONS, supabaseConfig } from "@/lib/supabase/config";
 
 // Refreshes the Supabase session cookie on each request (ADR-002). It makes no
 // authorization decisions: pages, layouts and Server Actions check the user
@@ -19,6 +19,7 @@ export async function proxy(request: NextRequest) {
   let response = forward();
   const { url, publishableKey } = supabaseConfig();
   const supabase = createServerClient(url, publishableKey, {
+    cookieOptions: AUTH_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return request.cookies.getAll();

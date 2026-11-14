@@ -19,12 +19,7 @@ Replaced by [roadmap.md](roadmap.md).
 
 ### §11 Open decisions
 
-Resolved in [decisions.md](decisions.md), except the items that list marks as Open:
-
-- hosting
-- data-retention periods
-
-(Budget edit permission was decided on 2026-11-13: any active member, O3.)
+Resolved in [decisions.md](decisions.md). Hosting and data retention were decided on 2026-11-14 (O1: Vercel and hosted Supabase; O2: kept until deleted), and budget edit permission on 2026-11-13 (any active member, O3).
 
 ## TRD amendments
 
@@ -84,9 +79,10 @@ Every table has a uuid `id`, `created_at`, and `updated_at` where relevant.
 4. **Owner-only actions** are enforced in policies and functions, not just hidden in the UI.
 5. **Invite tokens:** 32 random bytes, stored only as a SHA-256 hash. Expiry, use limit, and revocation are checked in a single transaction.
 6. **Input validation:** Zod at the Server Action boundary, plus database constraints.
-7. **Keys:** only the Supabase URL and publishable key (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, O4) are sent to the browser. The service-role key is never exposed to the client and is not used for normal requests. `.env*` files are gitignored; only `.env.example` is committed.
+7. **Keys:** only the Supabase URL and publishable key (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, O4) are sent to the browser. The service-role key is never exposed to the client and is not used for normal requests. `.env*` files are gitignored; only `.env.example` is committed. Since roadmap Phase 18 the build and the server refuse a secret in a public variable ([environment.md](environment.md)).
 8. **Auth checks:** sessions are checked on the server. Middleware only refreshes sessions and never makes authorization decisions.
-9. **Tests:** two households and three users. Cross-household select, insert, update, and delete must be denied on every table, and removed members must lose access ([ADR-012](adr/012-testing.md)).
+9. **Tests:** two households and three users. Cross-household select, insert, update, and delete must be denied on every table, and removed members must lose access ([ADR-012](adr/012-testing.md)). Since roadmap Phase 18 every function as well, with each household's rows compared before and after, and the catalog (RLS, privileges, `search_path`) pinned by a regression test ([testing.md](testing.md)).
+10. **Transport and browser:** HTTPS with HSTS, a Content Security Policy and the other security headers on every response, and session cookies that are `HttpOnly` and `Secure` (roadmap Phase 18, [security.md](security.md)).
 
 ### §5 Money logic
 
@@ -104,9 +100,4 @@ Rounding is defined in [ADR-004](adr/004-split-rounding.md):
 
 ### §12 Unconfirmed technical decisions
 
-Resolved in [decisions.md](decisions.md), except:
-
-- O1: hosting
-- O2: data retention
-- O5: React Hook Form
-- O6: invite expiry and use caps
+Resolved in [decisions.md](decisions.md), except O6 (invite expiry and use caps), still open. O1 (hosting) and O2 (data retention) were decided on 2026-11-14, O5 (React Hook Form: not used) on 2026-11-11.

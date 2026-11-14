@@ -44,11 +44,14 @@ contains a `<meta refresh>` and a client redirect, with no protected content), n
   link is never the protection.
 - **User ids come from the session.** The profile update uses the id from `getUser()`, never
   from the form. RLS (`profiles` update policy and column grants) enforces the same.
-- **Sessions:** cookies set by `@supabase/ssr`, `SameSite=Lax`, path `/`. They aren't `HttpOnly`;
-  that's the library's design, so a future browser client can read them. Access tokens last 1 hour
+- **Sessions:** cookies set by `@supabase/ssr` with `AUTH_COOKIE_OPTIONS`
+  ([src/lib/supabase/config.ts](../src/lib/supabase/config.ts), since roadmap Phase 18):
+  `HttpOnly` (no script in the page can read them; the app never talks to Supabase from the
+  browser), `Secure` in production, `SameSite=Lax`, path `/`. Access tokens last 1 hour
   (`jwt_expiry`); refresh tokens rotate.
 - **Sign-out** ends this device's session on the server (`scope: "local"`) and clears the cookies.
-  `getUser()` then rejects the old access token.
+  `getUser()` then rejects the old access token. The Data API itself accepts an unexpired access
+  token until it expires ([security.md](security.md#low), S9).
 - **Return paths:** `safeReturnPath()` allows only same-origin paths. It rejects `//host`,
   backslashes, control characters, absolute URLs and auth pages.
 - **Account existence:** sign-in says "Email or password is incorrect." for both cases. Sign-up
@@ -71,16 +74,12 @@ Local Auth settings live in [supabase/config.toml](../supabase/config.toml):
 `enable_confirmations = true`, `minimum_password_length = 8`, `secure_password_change = true`, and
 custom templates in [supabase/templates/](../supabase/templates/).
 
-## Hosted project checklist (O1, not done)
+## Hosted project (O1)
 
-`config.toml` only configures the local stack. A hosted Supabase project needs the same settings in
-its dashboard:
-
-- Site URL set to the production origin; email confirmations on; minimum password length 8;
-  secure password change on.
-- The confirmation and recovery templates from `supabase/templates/` (they link to
-  `/auth/confirm?token_hash=…`).
-- Custom SMTP. The built-in sender is heavily rate-limited and not meant for production.
+`config.toml` only configures the local stack. The hosted Supabase project (O1: Vercel and hosted
+Supabase, decided 2026-11-14) needs the same settings in its dashboard: the Site URL, email
+confirmations, password rules, the two templates from `supabase/templates/`, and custom SMTP. The
+full list is in [deployment.md](deployment.md#3-configure-auth). Not done yet: no hosted project exists.
 
 ## Known limitations
 
@@ -90,7 +89,9 @@ its dashboard:
 - **Email link scanners** that open links automatically can use up a one-time token before the
   person clicks it. They then see "That link is invalid or has expired" and can request a new one.
 - **No resend button.** Signing up again with the same address sends a new confirmation link.
-- **Account deletion and email change** are not built (D14, Phase 18; D22).
+- **Email change** isn't built (D22). **Account deletion** is an operator procedure on request,
+  not a button in the app (D14, decided 2026-11-14): see
+  [operations.md](operations.md#deleting-an-account-d14).
 - Changing your password while signed in is only reachable through the recovery email. With
   `secure_password_change` on, Supabase requires re-authentication for a password change from a
   session that wasn't started recently. A fresh recovery session passes (tested in
