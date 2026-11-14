@@ -31,11 +31,11 @@ Rules for every phase:
 
 Optional (each requires explicit approval):
 
-| #   | Phase                        |
-| --- | ---------------------------- |
-| 19  | Receipt OCR                  |
-| 20  | AI-assisted categorization   |
-| 21  | Debt simplification & export |
+| #   | Phase                                                                                                                                                                           |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 19  | Receipt OCR — Done (2026-11-15), for the owner's review: [receipts.md](receipts.md). On-device OCR (D15 amended), private receipts in Storage, review in the expense form (D31) |
+| 20  | AI-assisted categorization                                                                                                                                                      |
+| 21  | Debt simplification & export                                                                                                                                                    |
 
 ## Changes from the original 18-phase list
 

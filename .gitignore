@@ -16,6 +16,8 @@
 /playwright-report/
 
 # next.js
+# receipt-reading files copied from node_modules (scripts/copy-vendor-assets.mjs)
+/public/vendor/
 /.next/
 /out/
 

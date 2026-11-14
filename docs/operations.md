@@ -124,6 +124,13 @@ signed up with. Note their user id (Supabase dashboard → Authentication → Us
    Checked against the local stack: for a deleted test account, this matches exactly the entries
    that contain its email address.
 
+**Receipts:** receipts on expenses stay (they're the household's records). Uploads of theirs
+that never reached an expense aren't cleared by themselves, since that happens on the uploader's
+next upload. List them before step 4 with
+`select storage_path from public.receipts where uploaded_by = '<user id>' and status in ('pending', 'uploaded');`
+and delete those files in the dashboard (Storage, bucket `receipts`), then the rows with
+`delete from public.receipts where uploaded_by = '<user id>' and status in ('pending', 'uploaded');`.
+
 What stays: their profile row (as "Former member"), their memberships (with the dates they left),
 and every expense, split, payment, bill, item, chore, budget and journal entry they took part in,
 so the household's books still add up (D14). Names typed into descriptions or notes by anyone are

@@ -40,9 +40,13 @@ npx supabase db push --dry-run   # lists the migrations it would apply; read the
 npx supabase db push
 ```
 
-All 16 migrations in `supabase/migrations/` apply in order. They are additive (they create, never
+All the migrations in `supabase/migrations/` apply in order. They are additive (they create, never
 drop or rewrite data). Never run `supabase db reset` against a hosted project: it wipes it. See
 [migrations.md](migrations.md) for later releases.
+
+The receipts migration also creates the private `receipts` Storage bucket and its policies; check
+in the dashboard (Storage) that it exists and is **not public**. Storage is billed by size: receipts
+are at most 4 MiB each.
 
 Then check the result in the dashboard's SQL editor (read-only queries):
 
@@ -100,6 +104,8 @@ treated as spam.
 
 1. Import the repository. Vercel detects Next.js and npm (from `package-lock.json`); keep the
    default build (`next build`) and output settings.
+   The build first copies the receipt-reading files into `public/vendor` (`prebuild`); nothing
+   extra to configure.
 2. Node.js version: 22.x (from `engines` in `package.json`).
 3. Environment variables, for **Production** (and, pointing at the staging project, **Preview**):
 

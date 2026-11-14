@@ -54,6 +54,7 @@ const HOUSEHOLD_TABLES = [
   "notifications",
   "recurring_bill_shares",
   "recurring_bills",
+  "receipts",
   "settlements",
   "shopping_items",
 ] as const;
@@ -67,6 +68,9 @@ let today: string, monthStart: string;
 // Household H's records.
 let E: string, ED: string, S: string, B: string, I: string, C: string;
 let G: string, INV: string;
+// Receipts in H: one attached to E, one of Olive's waiting for review, one of Rae's.
+let RA: { id: string; path: string }, RU: { id: string; path: string };
+let RR: { id: string; path: string };
 let patNotifications: string[];
 // Household X's records (Xena's own).
 let EX: string, IX: string, CX: string, BX: string;
@@ -124,7 +128,35 @@ function snapshot(householdId: string): Record<string, unknown[]> {
   parts.push(
     `'profiles', ${agg("public.profiles", `x.id in (${people.map((p) => `'${p}'`).join(", ")})`)}`,
   );
+  // The household's stored receipt files: none added, changed or deleted.
+  parts.push(
+    `'storage_objects', (select coalesce(json_agg(json_build_object('name', o.name, 'size', o.metadata ->> 'size', 'updated_at', o.updated_at) order by o.name), '[]') from storage.objects o where o.bucket_id = 'receipts' and o.name like '${householdId}/%')`,
+  );
   return JSON.parse(sql(`select json_build_object(${parts.join(", ")});`));
+}
+
+/** A receipt stored and waiting for review (stand-in image bytes). */
+async function uploadedReceipt(user: User, householdId: string) {
+  const bytes = new Uint8Array(randomBytes(1500));
+  const started = (await must(
+    user.client.rpc("create_receipt", {
+      target_household_id: householdId,
+      content_type: "image/jpeg",
+      byte_size: bytes.length,
+      width: 1000,
+      height: 2000,
+    }),
+  )) as { receipt_id: string; storage_path: string };
+  const stored = await user.client.storage
+    .from("receipts")
+    .upload(started.storage_path, bytes, { contentType: "image/jpeg" });
+  if (stored.error) throw stored.error;
+  await ok(
+    user.client.rpc("mark_receipt_uploaded", {
+      target_receipt_id: started.receipt_id,
+    }),
+  );
+  return { id: started.receipt_id, path: started.storage_path };
 }
 
 async function createUser(name: string): Promise<User> {
@@ -361,6 +393,62 @@ function attacks(): Attack[] {
     rpc("archive_budget", "HJ031", (c) =>
       c.rpc("archive_budget", { target_budget_id: G }),
     ),
+    // Receipts (roadmap Phase 19).
+    rpc("create_receipt", "42501", (c) =>
+      c.rpc("create_receipt", {
+        target_household_id: H,
+        content_type: "image/jpeg",
+        byte_size: 100,
+        width: 1000,
+        height: 1000,
+      }),
+    ),
+    rpc("mark_receipt_uploaded", "HJ035", (c) =>
+      c.rpc("mark_receipt_uploaded", { target_receipt_id: RU.id }),
+    ),
+    rpc("discard_receipt", "HJ035", (c) =>
+      c.rpc("discard_receipt", { target_receipt_id: RU.id }),
+    ),
+    rpc("create_expense_with_receipt", "HJ035", (c) =>
+      c.rpc("create_expense_with_receipt", {
+        target_receipt_id: RU.id,
+        title: "Sneaky",
+        amount: 100,
+        expense_category: "other",
+        spent_on: today,
+        payer_id: olive.id,
+        method: "equal",
+        shares: shares([olive.id, 100]),
+      }),
+    ),
+    rpc("attach_receipt", "HJ009", (c) =>
+      c.rpc("attach_receipt", {
+        target_expense_id: E,
+        target_receipt_id: RU.id,
+      }),
+    ),
+    rpc("remove_receipt", "HJ035", (c) =>
+      c.rpc("remove_receipt", { target_receipt_id: RA.id }),
+    ),
+    rpc("household_receipt_files", "42501", (c) =>
+      c.rpc("household_receipt_files", { target_household_id: H }),
+    ),
+    rpc("insert receipts", "42501", (c, me) =>
+      untyped(c)
+        .from("receipts")
+        .insert({
+          household_id: H,
+          uploaded_by: me,
+          storage_path: `${H}/x.jpg`,
+          content_type: "image/jpeg",
+          byte_size: 1,
+          width: 1,
+          height: 1,
+        }),
+    ),
+    rpc("update receipts", "42501", (c) =>
+      untyped(c).from("receipts").update({ status: "removed" }).eq("id", RA.id),
+    ),
     // Reads.
     rpc("household_balances", "42501", (c) =>
       c.rpc("household_balances", {
@@ -590,6 +678,17 @@ beforeAll(async () => {
       muted_categories: ["shopping"],
     }),
   );
+  // Receipts: one attached to E (Olive added it), one of Olive's and one of
+  // Rae's waiting for review.
+  RA = await uploadedReceipt(olive, H);
+  await must(
+    olive.client.rpc("attach_receipt", {
+      target_expense_id: E,
+      target_receipt_id: RA.id,
+    }),
+  );
+  RU = await uploadedReceipt(olive, H);
+  RR = await uploadedReceipt(rae, H);
   // Quin was a member, with nothing owed, and has left.
   await ok(quin.client.rpc("leave_household", { target_household_id: H }));
 
@@ -642,6 +741,9 @@ beforeAll(async () => {
 afterAll(async () => {
   const ids = users.map((u) => u.id);
   if (ids.length) {
+    // Receipt files first: rows cascade with households, files don't.
+    const files = [RA, RU, RR].filter(Boolean).map((r) => r.path);
+    if (files.length) await admin.storage.from("receipts").remove(files);
     await admin.from("households").delete().in("created_by", ids);
     await admin.from("profiles").delete().in("id", ids);
     for (const id of ids) await admin.auth.admin.deleteUser(id);
@@ -729,7 +831,8 @@ describe("the catalog", () => {
              where n.nspname in ('public', 'private')
                and not coalesce(p.proconfig, '{}') @> array['search_path=""']`),
     ).toEqual([]);
-    // Each answers only about the caller's own memberships.
+    // Each answers only about the caller's own memberships, or (for the
+    // receipt Storage policies) whether the caller may touch one file.
     expect(
       lines(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
              where n.nspname = 'private' and p.prosecdef
@@ -737,8 +840,24 @@ describe("the catalog", () => {
     ).toEqual([
       "household_role",
       "is_household_member",
+      "is_sole_owner",
+      "receipt_file_allowed",
       "shares_household_with",
     ]);
+  });
+
+  it("keeps receipt files reachable only through the receipts policies", () => {
+    expect(
+      lines(`select policyname || ':' || cmd from pg_policies
+             where schemaname = 'storage' and tablename = 'objects' order by 1`),
+    ).toEqual([
+      "Receipts: delete files you may delete:DELETE",
+      "Receipts: read files you may see:SELECT",
+      "Receipts: store the file for your own pending receipt:INSERT",
+    ]);
+    expect(
+      sql(`select string_agg(id || '=' || public, ',') from storage.buckets`),
+    ).toBe("receipts=false");
   });
 
   it("keeps the D14 procedure for operators (the service role) only", () => {
@@ -748,12 +867,11 @@ describe("the catalog", () => {
     ).toBe("anon=false,authenticated=false,service_role=true");
   });
 
-  it("keeps the private schema out of the Data API, and has no storage buckets", async () => {
+  it("keeps the private schema out of the Data API", async () => {
     const { error } = await untyped(olive.client)
       .schema("private")
       .rpc("anonymise_account", { target_user_id: pat.id });
     expect(error?.code).toBe("PGRST106");
-    expect(sql(`select count(*) from storage.buckets`)).toBe("0");
   });
 });
 
@@ -783,6 +901,8 @@ describe("another household's records", () => {
         chores: 1,
         budgets: 1,
         budget_limits: 1,
+        receipts: 3,
+        storage_objects: 3,
         profiles: 5,
       });
       for (const table of [
@@ -851,6 +971,10 @@ describe("another household's records", () => {
       );
       expect((theirs as { rows: unknown[] }).rows).toEqual([]);
 
+      // Receipt files: not readable, not replaceable, not deletable, and no
+      // new file can be put in the household's folder.
+      await expectNoReceiptAccess(attacker.client);
+
       expect(snapshot(H)).toEqual(before);
     },
     60_000,
@@ -903,9 +1027,40 @@ describe("another household's records", () => {
       Object.entries(outcomes).filter(([, code]) => code !== "42501"),
     ).toEqual([]);
     expect(await must(anon.rpc("health_check"))).toBe(true);
+    await expectNoReceiptAccess(anon);
     expect(snapshot(H)).toEqual(before);
   }, 60_000);
 });
+
+async function expectNoReceiptAccess(client: TypedClient) {
+  const files = client.storage.from("receipts");
+  for (const path of [RA.path, RU.path, RR.path]) {
+    expect((await files.download(path)).error, path).not.toBeNull();
+    expect(
+      (
+        await files.upload(path, new Uint8Array([1, 2, 3]), {
+          contentType: "image/jpeg",
+          upsert: true,
+        })
+      ).error,
+      path,
+    ).not.toBeNull();
+    expect((await files.createSignedUrl(path, 60)).error, path).not.toBeNull();
+  }
+  await files.remove([RA.path, RU.path, RR.path]);
+  expect(
+    (
+      await files.upload(
+        `${H}/${randomUUID()}.jpg`,
+        new Uint8Array([1, 2, 3]),
+        { contentType: "image/jpeg" },
+      )
+    ).error,
+  ).not.toBeNull();
+  // Listing the folder shows nothing.
+  const listed = await files.list(H);
+  expect(listed.data ?? []).toEqual([]);
+}
 
 describe("a member's role", () => {
   it("can't do what's the owner's, the person's who added it, or the two people's in a settlement", async () => {
@@ -997,6 +1152,19 @@ describe("a member's role", () => {
       [
         "end_recurring_bill",
         () => rae.client.rpc("end_recurring_bill", { target_bill_id: B }),
+      ],
+      // Receipts follow D6: Rae neither added nor paid E.
+      [
+        "remove_receipt",
+        () => rae.client.rpc("remove_receipt", { target_receipt_id: RA.id }),
+      ],
+      [
+        "attach_receipt",
+        () =>
+          rae.client.rpc("attach_receipt", {
+            target_expense_id: E,
+            target_receipt_id: RR.id,
+          }),
       ],
     ];
     for (const [name, run] of refused)

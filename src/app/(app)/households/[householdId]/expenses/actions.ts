@@ -16,6 +16,7 @@ import {
 import { currencyExponent } from "@/lib/format";
 import { householdErrorMessage } from "@/lib/households/errors";
 import { getHousehold } from "@/lib/households/queries";
+import { removeReceiptFiles } from "@/lib/receipts/server";
 import { createClient } from "@/lib/supabase/server";
 
 // Every action re-checks the session. The creator and the editor are
@@ -83,6 +84,177 @@ export async function createExpense(
 
   revalidateHouseholdPages();
   redirect(`/households/${household.id}/expenses/${expenseId}?created=1`);
+}
+
+/**
+ * The reviewed expense from a receipt (roadmap Phase 19, D31): the same
+ * checks as createExpense, then create_expense_with_receipt records it and
+ * attaches the receipt in one transaction. Nothing read from the receipt is
+ * used unless the person submitted it in this form.
+ */
+export async function createExpenseFromReceipt(
+  _previous: ExpenseFormState,
+  formData: FormData,
+): Promise<ExpenseFormState> {
+  await requireUser();
+  const parsed = z
+    .object({
+      householdId: z.uuid(),
+      receiptId: z.uuid(),
+      requestKey: z.uuid(),
+    })
+    .safeParse({
+      householdId: formValue(formData, "householdId"),
+      receiptId: formValue(formData, "receiptId"),
+      requestKey: formValue(formData, "requestKey"),
+    });
+  if (!parsed.success) {
+    return { status: "error", message: "Reload the page and try again." };
+  }
+
+  const { household, raw, result } = await validate(
+    parsed.data.householdId,
+    formData,
+  );
+  if (!result.ok) {
+    return { status: "error", fieldErrors: result.fieldErrors, raw };
+  }
+
+  const { expense } = result;
+  const supabase = await createClient();
+  const { data: expenseId, error } = await supabase.rpc(
+    "create_expense_with_receipt",
+    {
+      target_receipt_id: parsed.data.receiptId,
+      title: expense.description,
+      amount: Number(expense.amountMinor),
+      expense_category: expense.category,
+      spent_on: expense.expenseDate,
+      payer_id: expense.paidBy,
+      method: expense.splitMethod,
+      shares: sharesJson(expense.shares),
+      request_key: parsed.data.requestKey,
+    },
+  );
+  if (error || !expenseId) {
+    return {
+      status: "error",
+      message: householdErrorMessage(error?.code),
+      raw,
+    };
+  }
+
+  revalidateHouseholdPages();
+  redirect(
+    `/households/${household.id}/expenses/${expenseId}?created=1&receipt=1`,
+  );
+}
+
+const receiptIds = z.object({ householdId: z.uuid(), receiptId: z.uuid() });
+
+/** Throws away your own receipt that isn't on an expense: file, then row. */
+export async function discardReceipt(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireUser();
+  const parsed = receiptIds.safeParse({
+    householdId: formValue(formData, "householdId"),
+    receiptId: formValue(formData, "receiptId"),
+  });
+  if (!parsed.success) return { status: "error", message: GENERIC_ERROR };
+
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("receipts")
+    .select("storage_path, status")
+    .eq("id", parsed.data.receiptId)
+    .maybeSingle();
+  if (!row || (row.status !== "pending" && row.status !== "uploaded")) {
+    return { status: "error", message: householdErrorMessage("HJ035") };
+  }
+  // The file first: a row without its file is harmless, a file without its
+  // row can't be reached any more.
+  if (!(await removeReceiptFiles(supabase, [row.storage_path]))) {
+    return {
+      status: "error",
+      message: "The receipt couldn't be deleted. Try again.",
+    };
+  }
+  const { error } = await supabase.rpc("discard_receipt", {
+    target_receipt_id: parsed.data.receiptId,
+  });
+  if (error)
+    return { status: "error", message: householdErrorMessage(error.code) };
+
+  return { status: "success", message: "The receipt is discarded." };
+}
+
+/** Takes the receipt off an expense (D6 people); the expense is untouched. */
+export async function removeReceipt(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireUser();
+  const parsed = receiptIds.safeParse({
+    householdId: formValue(formData, "householdId"),
+    receiptId: formValue(formData, "receiptId"),
+  });
+  if (!parsed.success) return { status: "error", message: GENERIC_ERROR };
+
+  const supabase = await createClient();
+  const { data: path, error } = await supabase.rpc("remove_receipt", {
+    target_receipt_id: parsed.data.receiptId,
+  });
+  if (error || !path) {
+    return { status: "error", message: householdErrorMessage(error?.code) };
+  }
+  // If deleting the file fails now, it's retried the next time this person
+  // uploads a receipt (my_receipt_files_to_clear).
+  await removeReceiptFiles(supabase, [path]);
+
+  revalidateHouseholdPages();
+  refresh();
+  return {
+    status: "success",
+    message: "The receipt is removed. The expense hasn't changed.",
+  };
+}
+
+/** Attaches your uploaded receipt to an expense (D6), replacing any other. */
+export async function attachReceipt(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireUser();
+  const parsed = z
+    .object({ householdId: z.uuid(), expenseId: z.uuid(), receiptId: z.uuid() })
+    .safeParse({
+      householdId: formValue(formData, "householdId"),
+      expenseId: formValue(formData, "expenseId"),
+      receiptId: formValue(formData, "receiptId"),
+    });
+  if (!parsed.success) return { status: "error", message: GENERIC_ERROR };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("attach_receipt", {
+    target_expense_id: parsed.data.expenseId,
+    target_receipt_id: parsed.data.receiptId,
+  });
+  if (error)
+    return { status: "error", message: householdErrorMessage(error.code) };
+  const removedPath = (data as { removed_path: string | null } | null)
+    ?.removed_path;
+  if (removedPath) await removeReceiptFiles(supabase, [removedPath]);
+
+  revalidateHouseholdPages();
+  refresh();
+  return {
+    status: "success",
+    message: removedPath
+      ? "The receipt is replaced."
+      : "The receipt is attached.",
+  };
 }
 
 export async function updateExpense(

@@ -2,8 +2,9 @@
 // Codes HJ001–HJ005 are defined in the Phase 6 migration, HJ006–HJ012 in the
 // expenses migration, HJ013 in the balances migration, HJ014–HJ017 in the
 // settlements migration, HJ018–HJ025 in the recurring bills migration,
-// HJ026–HJ030 in the shopping and chores migration and HJ031–HJ032 in the
-// budgets migration.
+// HJ026–HJ030 in the shopping and chores migration, HJ031–HJ032 in the
+// budgets migration and HJ035–HJ038 in the receipts migration (HJ033–HJ034
+// are operator-only).
 // Raw database messages are never shown.
 
 import { GENERIC_ERROR } from "@/lib/auth/errors";
@@ -61,6 +62,12 @@ const MESSAGES: Record<string, string> = {
   HJ031: "We couldn't find that budget.",
   HJ032:
     "There's already a budget for that and that period. Change its limit instead, or remove it first.",
+  HJ035:
+    "We couldn't find that receipt. It may have been removed, or cleared after a day unused.",
+  HJ036: "That receipt can't be used that way now. Reload the page.",
+  HJ037:
+    "You have 10 receipts waiting to be turned into expenses. Finish or discard some first.",
+  HJ038: "The receipt wasn't stored properly. Upload it again.",
   "42501": "You don't have permission to do that.",
   "23514": "Some of those details aren't valid. Check them and try again.",
   "22023": "Choose a timezone from the list.",

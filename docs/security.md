@@ -198,3 +198,25 @@ operator decides to (it deletes data). See [operations.md](operations.md#deletin
 
 S4 and S8 need settings in the hosted projects before launch, and S11 needs an operator decision.
 The rest are accepted and listed in [known-limitations.md](known-limitations.md).
+
+## Added in roadmap Phase 19: receipts
+
+Receipts brought the app's first file uploads, its first use of Supabase Storage and its first
+WebAssembly. How each is held ([receipts.md](receipts.md)):
+
+| Area               | Measure                                                                                                                                                                                                                                                        | Evidence                                                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Receipt data       | Read on the device (Tesseract.js); nothing goes to an OCR or AI service (D15 as amended). No raw OCR text is stored or logged.                                                                                                                                 | Code review; the only network calls are to this app                                                                        |
+| Upload endpoint    | `POST /api/households/[id]/receipts`: same-origin only (Route Handlers don't get Server Actions' Origin check, so it does its own), signed in, member (database), 4 MiB, the file's bytes checked (signature, completeness, dimensions); never decoded or run. | `image.test.ts`; `receipts.spec.ts` (403 without Origin, outsider refused)                                                 |
+| Storage            | A private bucket that accepts only images up to 4 MiB; policies tie every file to its row; no overwrites; no public or signed URL ever leaves the server; images are served after a check on every request, `no-store`, with a sandboxing CSP and `nosniff`.   | `receipts.test.ts`; the attack matrix (outsider, former member, signed out: no read, write, upload, signed URL or listing) |
+| Unattached uploads | Only their uploader sees them; at most 10 waiting per person and household; cleared after 24 hours.                                                                                                                                                            | `receipts.test.ts`                                                                                                         |
+| WebAssembly        | `'wasm-unsafe-eval'` only on `/vendor/*` responses (the OCR and PDF workers, from this origin); page policies unchanged. Zod's `eval` probe switched off in the browser.                                                                                       | `receipts.spec.ts` (headers; no CSP violation on any receipt page)                                                         |
+| PDFs               | Rendered in the browser with pdf.js: no XFA, no font installation, no PDF scripts; one page only; the server never receives a PDF.                                                                                                                             | `receipts.spec.ts`                                                                                                         |
+| Third-party code   | `tesseract.js` 7.0.0, `@tesseract.js-data/eng` 1.0.0, `pdfjs-dist` 6.4.299, pinned exactly; served from this site.                                                                                                                                             | `npm audit --omit=dev`: 0                                                                                                  |
+
+With receipts, the catalog and attack matrix cover 18 tables and 56 functions in `public`; the
+matrix makes 57 calls per attacker (9 for receipts), plus direct Storage access.
+
+Remaining: accuracy isn't a security property, but a misread amount is caught only by the person
+reviewing it (the form shows the receipt beside it, and nothing is saved unconfirmed). Receipt
+files aren't in database backups ([backup-recovery.md](backup-recovery.md)).

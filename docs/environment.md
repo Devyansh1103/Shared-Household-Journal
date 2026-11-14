@@ -12,6 +12,8 @@ visitor may do is decided by RLS and the database functions, not by keeping thes
 Names only are documented here and in [.env.example](../.env.example). Never commit or paste real
 values, and never print them: `npm run db:status` prints the local secret keys too.
 
+Receipts (roadmap Phase 19) added no variables: reading runs in the browser and needs no key.
+
 ## Checks
 
 [src/lib/env.ts](../src/lib/env.ts) checks the configuration; it names variables and never prints

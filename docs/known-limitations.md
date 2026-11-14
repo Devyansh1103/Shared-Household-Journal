@@ -5,20 +5,22 @@ What the first release doesn't do, or does with a known trade-off, as of roadmap
 
 ## Product
 
-| Limitation                                                                                                          | Tracked                               |
-| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| The household dashboard (roadmap Phase 11) isn't built; the household page lists each module instead.               | [roadmap.md](roadmap.md)              |
-| Notifications are in-app only: no email or push. Bills and chores due are shown when you look; nothing is sent.     | D12, D30, ADR-010, ADR-011            |
-| Deleting an account is an operator procedure on request, not a button.                                              | D14, [operations.md](operations.md)   |
-| The email address can't be changed in the app; no avatar upload; a password change goes through the recovery email. | D22 (proposed), [auth.md](auth.md)    |
-| No export, no debt simplification, no receipt OCR or AI categorisation.                                             | Phases 19–21 (optional), D15          |
-| How a former member's leftover balance is settled is undecided: a new payment needs two active members.             | O9 (open)                             |
-| A payment counts as soon as either person records it; there is no "confirmed by the other person" step.             | O10 (open), D9                        |
-| No budget rollover: each period starts again at its limit.                                                          | O11 (open)                            |
-| Invite links use the 7-day, 10-use defaults; whether those are also maximums is undecided.                          | O6 (open)                             |
-| Several rules are working defaults not yet approved by the owner.                                                   | D22, D25–D28, parts of D29 (proposed) |
-| English only, formatted for `en-IN`; light mode only.                                                               | D18, D19                              |
-| Names typed into descriptions or notes aren't changed when an account is anonymised.                                | D14                                   |
+| Limitation                                                                                                                                                                           | Tracked                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| The household dashboard (roadmap Phase 11) isn't built; the household page lists each module instead.                                                                                | [roadmap.md](roadmap.md)                               |
+| Notifications are in-app only: no email or push. Bills and chores due are shown when you look; nothing is sent.                                                                      | D12, D30, ADR-010, ADR-011                             |
+| Deleting an account is an operator procedure on request, not a button.                                                                                                               | D14, [operations.md](operations.md)                    |
+| The email address can't be changed in the app; no avatar upload; a password change goes through the recovery email.                                                                  | D22 (proposed), [auth.md](auth.md)                     |
+| No export, no debt simplification, no receipt OCR or AI categorisation.                                                                                                              | Phases 19–21 (optional), D15                           |
+| How a former member's leftover balance is settled is undecided: a new payment needs two active members.                                                                              | O9 (open)                                              |
+| A payment counts as soon as either person records it; there is no "confirmed by the other person" step.                                                                              | O10 (open), D9                                         |
+| No budget rollover: each period starts again at its limit.                                                                                                                           | O11 (open)                                             |
+| Invite links use the 7-day, 10-use defaults; whether those are also maximums is undecided.                                                                                           | O6 (open)                                              |
+| Several rules are working defaults not yet approved by the owner.                                                                                                                    | D22, D25–D28, parts of D29 (proposed)                  |
+| English only, formatted for `en-IN`; light mode only.                                                                                                                                | D18, D19                                               |
+| Receipt reading (on the device) isn't measured for accuracy on real receipts; English only; one page per PDF; one receipt per expense; items aren't stored; no category suggestions. | [receipts.md](receipts.md#known-limitations), D15, D31 |
+| Receipts aren't journalled or notified.                                                                                                                                              | [receipts.md](receipts.md#known-limitations)           |
+| Names typed into descriptions or notes aren't changed when an account is anonymised.                                                                                                 | D14                                                    |
 
 ## Security
 
@@ -35,14 +37,15 @@ What the first release doesn't do, or does with a known trade-off, as of roadmap
 
 ## Operations
 
-| Limitation                                                                                            | Tracked                                            |
-| ----------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Nothing is deployed; no hosted project exists, so hosted settings, backups and restores are untested. | [production-readiness.md](production-readiness.md) |
-| No monitoring or alerting is configured; the health check and log lines are ready for it.             | [operations.md](operations.md#monitoring)          |
-| No CI pipeline; checks are run by hand before each commit.                                            | [testing.md](testing.md)                           |
-| Test coverage isn't measured (no coverage tool installed).                                            | [testing.md](testing.md)                           |
-| Production email needs custom SMTP; the built-in sender is for testing only.                          | [deployment.md](deployment.md#email)               |
-| No privacy policy or terms of use exist; they're needed before inviting the public.                   | [production-readiness.md](production-readiness.md) |
+| Limitation                                                                                                                 | Tracked                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Nothing is deployed; no hosted project exists, so hosted settings, backups and restores are untested.                      | [production-readiness.md](production-readiness.md)                           |
+| No monitoring or alerting is configured; the health check and log lines are ready for it.                                  | [operations.md](operations.md#monitoring)                                    |
+| Receipt files live in Storage, outside database backups; unused uploads are cleared only when their uploader next uploads. | [backup-recovery.md](backup-recovery.md), [receipts.md](receipts.md#storage) |
+| No CI pipeline; checks are run by hand before each commit.                                                                 | [testing.md](testing.md)                                                     |
+| Test coverage isn't measured (no coverage tool installed).                                                                 | [testing.md](testing.md)                                                     |
+| Production email needs custom SMTP; the built-in sender is for testing only.                                               | [deployment.md](deployment.md#email)                                         |
+| No privacy policy or terms of use exist; they're needed before inviting the public.                                        | [production-readiness.md](production-readiness.md)                           |
 
 ## Scale
 

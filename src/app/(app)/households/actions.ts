@@ -14,6 +14,7 @@ import {
   invitationActionSchema,
   memberActionSchema,
 } from "@/lib/households/schemas";
+import { removeReceiptFiles } from "@/lib/receipts/server";
 import { createClient } from "@/lib/supabase/server";
 
 // Every action re-checks the session itself. User ids for the caller come from
@@ -231,6 +232,23 @@ export async function deleteHousehold(
   if (!householdId.success) return { status: "error", message: GENERIC_ERROR };
 
   const supabase = await createClient();
+  // Receipt files first (D31): rows cascade with the household, files in
+  // Storage don't. Only the owner, as the last member, gets the list, which is
+  // also what delete_household requires; otherwise it answers below.
+  const files = await supabase.rpc("household_receipt_files", {
+    target_household_id: householdId.data,
+  });
+  if (!files.error && files.data.length > 0) {
+    const removed = await removeReceiptFiles(supabase, files.data);
+    if (!removed) {
+      return {
+        status: "error",
+        message:
+          "The household's receipts couldn't be deleted, so nothing was deleted. Try again.",
+      };
+    }
+  }
+
   const { error } = await supabase.rpc("delete_household", {
     target_household_id: householdId.data,
   });

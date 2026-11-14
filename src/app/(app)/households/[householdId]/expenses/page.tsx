@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { io } from "next/cache";
-import { PlusIcon, XIcon } from "lucide-react";
+import { PlusIcon, ReceiptTextIcon, XIcon } from "lucide-react";
 import { FormAlert } from "@/components/form-alert";
 import { PageContainer } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -71,12 +71,20 @@ async function ExpenseHistory({
   }));
 
   const addButton = (
-    <Button asChild>
-      <Link href={`${base}/new`}>
-        <PlusIcon aria-hidden="true" data-icon="inline-start" />
-        Add expense
-      </Link>
-    </Button>
+    <div className="flex flex-wrap gap-2">
+      <Button asChild>
+        <Link href={`${base}/new`}>
+          <PlusIcon aria-hidden="true" data-icon="inline-start" />
+          Add expense
+        </Link>
+      </Button>
+      <Button variant="outline" asChild>
+        <Link href={`${base}/scan`}>
+          <ReceiptTextIcon aria-hidden="true" data-icon="inline-start" />
+          Scan a receipt
+        </Link>
+      </Button>
+    </div>
   );
 
   return (

@@ -3,11 +3,11 @@
 Three layers of automated tests ([ADR-012](adr/012-testing.md)), plus the quality gates that run
 before every commit. Commands are npm scripts; none needs a variable set by hand.
 
-| Layer      | Command            | Where                                  | Needs                                                    | Size (2026-11-14)                                 |
+| Layer      | Command            | Where                                  | Needs                                                    | Size (2026-11-15)                                 |
 | ---------- | ------------------ | -------------------------------------- | -------------------------------------------------------- | ------------------------------------------------- |
-| Unit       | `npm test`         | `src/**/*.test.ts` (Vitest)            | Nothing                                                  | 47 files, 482 tests                               |
-| Database   | `npm run test:db`  | `supabase/tests/**/*.test.ts` (Vitest) | The local stack (`npm run db:start`, Docker)             | 16 files, 291 tests                               |
-| End to end | `npm run test:e2e` | `e2e/*.spec.ts` (Playwright)           | The local stack and a production build (`npm run build`) | 10 files, 100 runs (50 tests × desktop and phone) |
+| Unit       | `npm test`         | `src/**/*.test.ts` (Vitest)            | Nothing                                                  | 51 files, 538 tests                               |
+| Database   | `npm run test:db`  | `supabase/tests/**/*.test.ts` (Vitest) | The local stack (`npm run db:start`, Docker)             | 17 files, 311 tests                               |
+| End to end | `npm run test:e2e` | `e2e/*.spec.ts` (Playwright)           | The local stack and a production build (`npm run build`) | 11 files, 108 runs (54 tests × desktop and phone) |
 
 ## Quality gates
 
@@ -50,6 +50,7 @@ from `supabase status`, held in memory, never written or printed
 | `bills.test.ts`, `shopping-chores.test.ts`, `budgets.test.ts`, `notifications.test.ts` | Each module's functions, rights, journal events and notifications.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **`authorization.test.ts`** (Phase 18)                                                 | The catalog (RLS everywhere, no views, exact table, column and function privileges, pinned `search_path`, the private schema not exposed); 48 attacks with another household's ids by an outsider, a former member and a signed-out visitor, each refused with the expected code and every row unchanged (compared with a superuser snapshot); an ordinary member trying the owner's and other people's actions; people and records from another household used inside your own. |
 | **`financial-invariants.test.ts`** (Phase 18)                                          | 120 random operations (seeded; `FINANCE_SEED` to vary) of expenses with all three split methods, edits, deletes, restores, payments within and over what's owed, voids and retries, then a recorded bill with retries: shares add up for every expense, balances net to zero and match paid − share + payments from the raw rows, pairs agree with nets, retries record once, budgets and analytics equal direct sums. Also run with seeds 1, 77 and 4242.                       |
+| **`receipts.test.ts`** (Phase 19)                                                      | The private bucket; Storage policies (only the uploader stores, once, at the row's path; no overwrite; images only); a stored file must match its row; who sees what; confirming an expense from a receipt in one transaction (retries, a refused split leaves the receipt waiting); D6 for attaching, replacing and removing (the expense never changes); discarding; clearing after 24 hours; deleting the household; no direct writes.                                        |
 | **`operations.test.ts`** (Phase 18)                                                    | The health check; account deletion (D14) end to end: refusals (`HJ033`, `HJ034`, not for signed-in or signed-out roles), the hard delete refused, the soft delete ending sign-in, the profile anonymised, every record unchanged, and what other members see.                                                                                                                                                                                                                    |
 
 ## End-to-end tests
@@ -58,7 +59,8 @@ A real browser (set `PLAYWRIGHT_CHANNEL=msedge` or `chrome` to use an installed 
 `next start` on port 3100, one test at a time, each in a desktop and a phone (Pixel 7) viewport.
 Start the server yourself to reuse it, or let Playwright start it.
 
-The workflows of the Phase 18 brief, all executed on 2026-11-14 (100 of 100 passed):
+The workflows of the Phase 18 brief, all executed on 2026-11-14 (100 of 100 passed) and again on
+2026-11-15 with the receipt tests (108 of 108 passed):
 
 | Workflow                    | Tests                                                                                                                                                                                                                                               |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -69,6 +71,12 @@ The workflows of the Phase 18 brief, all executed on 2026-11-14 (100 of 100 pass
 | E. Budgets and analytics    | `budgets.spec.ts`: an overall and a category budget, used and left, over the limit, a changed limit, analytics totals, categories, people and filters.                                                                                              |
 | F. Household collaboration  | `shopping-chores.spec.ts` (items: add, buy, reopen, edit, remove; chores: assign, complete, reassign, rights), `notifications.spec.ts`, `journal.spec.ts`.                                                                                          |
 | G. Authorization            | `workflows.spec.ts` G (26 pages of another household by URL: each "We couldn't find that…", nothing of it in the page), each module's "a non-member sees…" test, the rights tests for bills and chores, and `authorization.test.ts` above.          |
+
+`receipts.spec.ts` (Phase 19) runs the **real** OCR engine in the browser on receipts the test
+renders (a photo and a one-page PDF): the pre-filled form, creating the expense with its receipt
+(a double click records once), refused files, discarding, attaching and removing on an expense,
+what members, outsiders and signed-out visitors can reach, the phone layout, and that only the OCR
+worker may compile WebAssembly. The receipts are clean printed text: not an accuracy measure.
 
 `workflows.spec.ts` also checks every response's security headers, the absence of `X-Powered-By`,
 `/api/health`, and that the browser reports no Content Security Policy violation on any page those

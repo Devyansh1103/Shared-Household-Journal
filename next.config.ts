@@ -43,13 +43,35 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000" },
 ];
 
+// The receipt-reading workers (roadmap Phase 19) compile WebAssembly: the OCR
+// engine and the PDF image decoders. A dedicated worker runs under the policy
+// of its own script's response, so only the files in /vendor (copied from
+// node_modules, served from this origin) get 'wasm-unsafe-eval'. Pages keep
+// the policy above: no WebAssembly and no eval there.
+const vendorPolicy = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   // Don't advertise the framework in every response.
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // Later entries win for the same header.
+      {
+        source: "/vendor/:path*",
+        headers: [{ key: "Content-Security-Policy", value: vendorPolicy }],
+      },
+    ];
   },
   turbopack: {
     rules: {

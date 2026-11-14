@@ -18,6 +18,7 @@ Records shared household expenses and home coordination. **The app never moves m
 - [docs/shopping-chores.md](docs/shopping-chores.md): the shared shopping list and one-off chores: fields, filters, who may do what (D28), people who leave, the journal
 - [docs/budgets.md](docs/budgets.md): budgets and analytics: what counts as spending, periods, limits over time, the figures and statuses, paid against share, the database reads
 - [docs/notifications.md](docs/notifications.md): in-app notifications: who each event notifies (D30), how they're made with their events, the notification centre, Needs attention, the settings, security
+- [docs/receipts.md](docs/receipts.md): receipts (Phase 19): on-device OCR (D15 as amended), uploads and private storage, the review, attaching and removing (D31), privacy and limits
 - [docs/security.md](docs/security.md): the Phase 18 security audit: findings by severity, what was fixed, what was checked, remaining risks
 - [docs/production-readiness.md](docs/production-readiness.md): the release checklist with evidence (Verified / Failed / Not tested / N/A)
 - [docs/known-limitations.md](docs/known-limitations.md): what the first release doesn't do, and accepted trade-offs

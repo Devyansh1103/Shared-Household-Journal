@@ -2,14 +2,18 @@
 
 ## What holds data
 
-| Part                           | Holds                                                                                                 | Backed up by                                    |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| The Supabase Postgres database | Everything: accounts (`auth` schema), profiles, households, money records, the journal, notifications | Supabase's backups, plus your own dumps (below) |
-| The app on Vercel              | Nothing: it keeps no state between requests                                                           | Git (the code) and Vercel's deployment history  |
-| File storage                   | Nothing: no storage buckets exist (no uploads)                                                        | —                                               |
-| Auth emails                    | Sent through your SMTP service; nothing the app needs                                                 | —                                               |
+| Part                           | Holds                                                                                                 | Backed up by                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| The Supabase Postgres database | Everything: accounts (`auth` schema), profiles, households, money records, the journal, notifications | Supabase's backups, plus your own dumps (below)               |
+| The app on Vercel              | Nothing: it keeps no state between requests                                                           | Git (the code) and Vercel's deployment history                |
+| File storage                   | Receipt images, in the private `receipts` bucket (Phase 19)                                           | **Not** in database backups: copy the bucket yourself (below) |
+| Auth emails                    | Sent through your SMTP service; nothing the app needs                                                 | —                                                             |
 
-So a backup of the database is a backup of the app.
+So a backup of the app is a backup of the database **plus the receipts bucket**. Supabase's
+database backups keep each receipt's row but not its file: download the bucket's files on the
+same schedule (the Storage API or its S3-compatible access, with the secret key on an operator's
+machine) and keep them as privately as the dumps. After a restore, receipts whose files are
+missing show without their image until removed.
 
 ## Backups
 
@@ -32,7 +36,11 @@ Decided by the owner on 2026-11-14: **records are kept until they're deleted**, 
 expiry.
 
 - A household's records are kept until its owner deletes the household (when they're the only
-  member left, D14). That deletion is permanent and removes everything in the household.
+  member left, D14). That deletion is permanent and removes everything in the household,
+  receipt files included.
+- The one timed exception (D31, roadmap Phase 19): a receipt uploaded but never put on an expense
+  is cleared after 24 hours. Receipts on expenses follow the rule above; a removed receipt's file
+  is deleted at once.
 - An account's profile is kept until the account is deleted, which anonymises it to "Former
   member" and keeps the records others rely on (D14, [operations.md](operations.md#deleting-an-account-d14)).
 - Voided payments, deleted expenses, removed items and chores, and the journal are kept with their

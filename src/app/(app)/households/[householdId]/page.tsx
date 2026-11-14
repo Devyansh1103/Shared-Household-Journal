@@ -1,7 +1,12 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeftIcon, NotebookTextIcon, PlusIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  NotebookTextIcon,
+  PlusIcon,
+  ReceiptTextIcon,
+} from "lucide-react";
 import { FormAlert } from "@/components/form-alert";
 import { ScrollToHash } from "@/components/scroll-to-hash";
 import { Button } from "@/components/ui/button";
@@ -117,6 +122,12 @@ async function HouseholdContent({
             <Link href={`/households/${household.id}/expenses/new`}>
               <PlusIcon aria-hidden="true" data-icon="inline-start" />
               Add expense
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href={`/households/${household.id}/expenses/scan`}>
+              <ReceiptTextIcon aria-hidden="true" data-icon="inline-start" />
+              Scan a receipt
             </Link>
           </Button>
           <Button variant="outline" asChild>

@@ -701,6 +701,103 @@ export type Database = {
         };
         Relationships: [];
       };
+      receipts: {
+        Row: {
+          attached_at: string | null;
+          attached_by: string | null;
+          byte_size: number;
+          content_type: string;
+          created_at: string;
+          creation_key: string | null;
+          expense_id: string | null;
+          height: number;
+          household_id: string;
+          id: string;
+          removed_at: string | null;
+          removed_by: string | null;
+          status: Database["public"]["Enums"]["receipt_status"];
+          storage_path: string;
+          uploaded_at: string | null;
+          uploaded_by: string;
+          width: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          attached_at?: string | null;
+          attached_by?: string | null;
+          byte_size: number;
+          content_type: string;
+          created_at?: string;
+          creation_key?: string | null;
+          expense_id?: string | null;
+          height: number;
+          household_id: string;
+          id?: string;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          status?: Database["public"]["Enums"]["receipt_status"];
+          storage_path: string;
+          uploaded_at?: string | null;
+          uploaded_by: string;
+          width: number;
+        };
+        Update: {
+          attached_at?: string | null;
+          attached_by?: string | null;
+          byte_size?: number;
+          content_type?: string;
+          created_at?: string;
+          creation_key?: string | null;
+          expense_id?: string | null;
+          height?: number;
+          household_id?: string;
+          id?: string;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          status?: Database["public"]["Enums"]["receipt_status"];
+          storage_path?: string;
+          uploaded_at?: string | null;
+          uploaded_by?: string;
+          width?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "receipts_attached_by_fkey";
+            columns: ["attached_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "receipts_expense_fkey";
+            columns: ["expense_id", "household_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["id", "household_id"];
+          },
+          {
+            foreignKeyName: "receipts_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "receipts_removed_by_fkey";
+            columns: ["removed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "receipts_uploaded_by_fkey";
+            columns: ["uploaded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       recurring_bill_shares: {
         Row: {
           bill_id: string;
@@ -1034,6 +1131,10 @@ export type Database = {
         Args: { target_budget_id: string };
         Returns: undefined;
       };
+      attach_receipt: {
+        Args: { target_expense_id: string; target_receipt_id: string };
+        Returns: Json;
+      };
       complete_chore: { Args: { target_chore_id: string }; Returns: undefined };
       create_budget: {
         Args: {
@@ -1071,6 +1172,20 @@ export type Database = {
         };
         Returns: string;
       };
+      create_expense_with_receipt: {
+        Args: {
+          amount: number;
+          expense_category: Database["public"]["Enums"]["expense_category"];
+          method: Database["public"]["Enums"]["split_method"];
+          payer_id: string;
+          request_key?: string;
+          shares: Json;
+          spent_on: string;
+          target_receipt_id: string;
+          title: string;
+        };
+        Returns: string;
+      };
       create_household: {
         Args: {
           currency: string;
@@ -1079,6 +1194,17 @@ export type Database = {
           time_zone: string;
         };
         Returns: string;
+      };
+      create_receipt: {
+        Args: {
+          byte_size: number;
+          content_type: string;
+          height: number;
+          request_key?: string;
+          target_household_id: string;
+          width: number;
+        };
+        Returns: Json;
       };
       create_recurring_bill: {
         Args: {
@@ -1106,6 +1232,10 @@ export type Database = {
         Args: { target_household_id: string };
         Returns: undefined;
       };
+      discard_receipt: {
+        Args: { target_receipt_id: string };
+        Returns: undefined;
+      };
       end_recurring_bill: {
         Args: { target_bill_id: string };
         Returns: undefined;
@@ -1127,6 +1257,10 @@ export type Database = {
           target_household_id: string;
         };
         Returns: Json;
+      };
+      forget_my_stale_receipts: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
       };
       get_invite_preview: {
         Args: { token: string };
@@ -1173,6 +1307,10 @@ export type Database = {
         };
         Returns: Json;
       };
+      household_receipt_files: {
+        Args: { target_household_id: string };
+        Returns: string[];
+      };
       leave_household: {
         Args: { target_household_id: string };
         Returns: undefined;
@@ -1180,6 +1318,10 @@ export type Database = {
       mark_notifications_read: {
         Args: { target_notification_ids?: string[] };
         Returns: number;
+      };
+      mark_receipt_uploaded: {
+        Args: { target_receipt_id: string };
+        Returns: undefined;
       };
       my_notifications: {
         Args: {
@@ -1190,6 +1332,13 @@ export type Database = {
           unread_only?: boolean;
         };
         Returns: Json;
+      };
+      my_receipt_files_to_clear: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          receipt_id: string;
+          storage_path: string;
+        }[];
       };
       my_unread_notification_count: {
         Args: Record<PropertyKey, never>;
@@ -1237,6 +1386,7 @@ export type Database = {
         Args: { member_user_id: string; target_household_id: string };
         Returns: undefined;
       };
+      remove_receipt: { Args: { target_receipt_id: string }; Returns: string };
       remove_shopping_item: {
         Args: { target_item_id: string };
         Returns: undefined;
@@ -1414,6 +1564,7 @@ export type Database = {
         | "shopping"
         | "chores"
         | "budgets";
+      receipt_status: "pending" | "uploaded" | "attached" | "removed";
       split_method: "equal" | "percentage" | "custom";
     };
     CompositeTypes: {
@@ -1611,6 +1762,7 @@ export const Constants = {
         "chores",
         "budgets",
       ],
+      receipt_status: ["pending", "uploaded", "attached", "removed"],
       split_method: ["equal", "percentage", "custom"],
     },
   },

@@ -16,7 +16,9 @@ import { formatBasisPoints } from "@/domain/money/amount";
 import { categoryLabel } from "@/lib/expenses/categories";
 import { getExpense } from "@/lib/expenses/queries";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { deleteExpense, restoreExpense } from "../actions";
+import { getExpenseReceipt } from "@/lib/receipts/queries";
+import { deleteExpense, removeReceipt, restoreExpense } from "../actions";
+import { ReceiptAttach } from "./receipt-attach";
 
 export const metadata: Metadata = { title: "Expense" };
 
@@ -56,6 +58,7 @@ async function ExpenseDetail({
   const notice = (Object.keys(NOTICES) as (keyof typeof NOTICES)[]).find(
     (key) => query[key] === "1",
   );
+  const receipt = await getExpenseReceipt(expense.id);
   const base = `/households/${household.id}/expenses`;
   const currency = household.currencyCode;
   const fields = { householdId: household.id, expenseId: expense.id };
@@ -71,7 +74,13 @@ async function ExpenseDetail({
         Expenses
       </Link>
 
-      {notice ? <FormAlert tone="success">{NOTICES[notice]}</FormAlert> : null}
+      {notice ? (
+        <FormAlert tone="success">
+          {notice === "created" && query.receipt === "1" && receipt.attached
+            ? "The expense is saved, with its receipt attached."
+            : NOTICES[notice]}
+        </FormAlert>
+      ) : null}
       {deleted ? (
         <FormAlert tone="info">
           Deleted by {expense.deletedByName} on{" "}
@@ -158,6 +167,72 @@ async function ExpenseDetail({
             </>
           )}
         </p>
+      </Section>
+
+      <Section
+        title="Receipt"
+        description="Stored privately for this household. It never changes the amount or the split."
+      >
+        {receipt.attached ? (
+          <div className="space-y-3">
+            <a
+              href={`/api/receipts/${receipt.attached.id}`}
+              target="_blank"
+              rel="noopener"
+              className="block rounded-xl focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              {/* Served by the app after checking access; never cached. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/receipts/${receipt.attached.id}`}
+                alt={`Receipt for ${expense.description}`}
+                className="max-h-96 w-full rounded-xl border border-border bg-muted object-contain"
+              />
+              <span className="sr-only"> (opens full size in a new tab)</span>
+            </a>
+            <p className="type-help">
+              Attached by {receipt.attached.attachedByName} on{" "}
+              {formatDateTime(receipt.attached.attachedAt, household.timezone)}.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <a href={`/api/receipts/${receipt.attached.id}?download=1`}>
+                  Download receipt
+                </a>
+              </Button>
+              {expense.canChange && !deleted ? (
+                <ConfirmActionDialog
+                  triggerLabel="Remove receipt"
+                  triggerVariant="ghost"
+                  title="Remove the receipt?"
+                  description="The receipt is deleted. The expense, its amount and its split don't change."
+                  confirmLabel="Remove receipt"
+                  cancelLabel="Keep it"
+                  pendingLabel="Removing…"
+                  destructive
+                  action={removeReceipt}
+                  fields={{
+                    householdId: household.id,
+                    receiptId: receipt.attached.id,
+                  }}
+                />
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <p className="type-secondary">
+            {receipt.lastRemoved
+              ? `No receipt. ${receipt.lastRemoved.removedByName} removed one on ${formatDateTime(receipt.lastRemoved.removedAt, household.timezone)}.`
+              : "No receipt is attached."}
+          </p>
+        )}
+        {expense.canChange && !deleted ? (
+          <ReceiptAttach
+            householdId={household.id}
+            expenseId={expense.id}
+            replacing={Boolean(receipt.attached)}
+          />
+        ) : null}
       </Section>
 
       {expense.canChange ? (

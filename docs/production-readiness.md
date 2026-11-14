@@ -24,28 +24,28 @@ replacements. See [Before production](#before-production).
 
 ## Security
 
-| Check                                                                                    | Status     | Evidence                                                                                                                  |
-| ---------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- |
-| No critical or high findings open                                                        | Verified   | [security.md](security.md)                                                                                                |
-| RLS on every table; no views                                                             | Verified   | `authorization.test.ts` › the catalog                                                                                     |
-| `anon` can't read or write any table; runs only `health_check`                           | Verified   | the catalog test; the signed-out attack test (every function and table refused with `42501`)                              |
-| `authenticated`: `SELECT` plus exactly ten column grants                                 | Verified   | the catalog test                                                                                                          |
-| Every function pins `search_path`; no dynamic SQL                                        | Verified   | the catalog test; a search of all 16 migrations                                                                           |
-| Another household's records refused by every function and table, and left unchanged      | Verified   | `authorization.test.ts`: 48 attacks by an outsider and by a former member, a superuser snapshot compared before and after |
-| An ordinary member can't do the owner's or other people's actions                        | Verified   | `authorization.test.ts` › a member's role                                                                                 |
-| People and records from another household refused inside your own                        | Verified   | `authorization.test.ts` › references across households                                                                    |
-| Another household's pages show nothing                                                   | Verified   | `workflows.spec.ts` G (26 pages), each module's non-member test                                                           |
-| Every page, layout and Server Action checks the session; ids from the session; Zod input | Verified   | code audit of 48 entry points ([security.md](security.md#scope-and-method))                                               |
-| Security headers and CSP on every response; no `X-Powered-By`                            | Verified   | `workflows.spec.ts` › headers test                                                                                        |
-| No CSP violations                                                                        | Verified   | all 100 e2e runs; the six-width sweep (see Accessibility)                                                                 |
-| Session cookies `HttpOnly`, `Secure` (production), `SameSite=Lax`                        | Verified   | `workflows.spec.ts` A                                                                                                     |
-| No secret in the app, the build or a public variable                                     | Verified   | code search; `src/lib/env.test.ts`; the build and start-up checks                                                         |
-| Production dependencies: no known vulnerabilities                                        | Verified   | `npm audit --omit=dev`: 0                                                                                                 |
-| Development dependencies                                                                 | Failed     | `npm audit`: 13 (2 low, 11 moderate), no non-breaking fix; none ships in the app (accepted, S6)                           |
-| Rate limiting at the edge (S4)                                                           | Not tested | needs the Vercel project ([deployment.md](deployment.md#security-settings))                                               |
-| GraphQL turned off in the hosted project (S8)                                            | Not tested | needs the hosted project                                                                                                  |
-| Leaked-password protection, CAPTCHA (I3)                                                 | Not tested | hosted settings; optional                                                                                                 |
-| Multi-factor authentication                                                              | N/A        | not in the approved scope (I2)                                                                                            |
+| Check                                                                                    | Status     | Evidence                                                                                                                                       |
+| ---------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| No critical or high findings open                                                        | Verified   | [security.md](security.md)                                                                                                                     |
+| RLS on every table; no views                                                             | Verified   | `authorization.test.ts` › the catalog                                                                                                          |
+| `anon` can't read or write any table; runs only `health_check`                           | Verified   | the catalog test; the signed-out attack test (every function and table refused with `42501`)                                                   |
+| `authenticated`: `SELECT` plus exactly ten column grants                                 | Verified   | the catalog test                                                                                                                               |
+| Every function pins `search_path`; no dynamic SQL                                        | Verified   | the catalog test; a search of all 16 migrations                                                                                                |
+| Another household's records refused by every function and table, and left unchanged      | Verified   | `authorization.test.ts`: 57 attacks (48 before receipts) by an outsider and by a former member, a superuser snapshot compared before and after |
+| An ordinary member can't do the owner's or other people's actions                        | Verified   | `authorization.test.ts` › a member's role                                                                                                      |
+| People and records from another household refused inside your own                        | Verified   | `authorization.test.ts` › references across households                                                                                         |
+| Another household's pages show nothing                                                   | Verified   | `workflows.spec.ts` G (26 pages), each module's non-member test                                                                                |
+| Every page, layout and Server Action checks the session; ids from the session; Zod input | Verified   | code audit of 48 entry points ([security.md](security.md#scope-and-method))                                                                    |
+| Security headers and CSP on every response; no `X-Powered-By`                            | Verified   | `workflows.spec.ts` › headers test                                                                                                             |
+| No CSP violations                                                                        | Verified   | all 100 e2e runs; the six-width sweep (see Accessibility)                                                                                      |
+| Session cookies `HttpOnly`, `Secure` (production), `SameSite=Lax`                        | Verified   | `workflows.spec.ts` A                                                                                                                          |
+| No secret in the app, the build or a public variable                                     | Verified   | code search; `src/lib/env.test.ts`; the build and start-up checks                                                                              |
+| Production dependencies: no known vulnerabilities                                        | Verified   | `npm audit --omit=dev`: 0                                                                                                                      |
+| Development dependencies                                                                 | Failed     | `npm audit`: 13 (2 low, 11 moderate), no non-breaking fix; none ships in the app (accepted, S6)                                                |
+| Rate limiting at the edge (S4)                                                           | Not tested | needs the Vercel project ([deployment.md](deployment.md#security-settings))                                                                    |
+| GraphQL turned off in the hosted project (S8)                                            | Not tested | needs the hosted project                                                                                                                       |
+| Leaked-password protection, CAPTCHA (I3)                                                 | Not tested | hosted settings; optional                                                                                                                      |
+| Multi-factor authentication                                                              | N/A        | not in the approved scope (I2)                                                                                                                 |
 
 ## Financial integrity
 
@@ -68,10 +68,10 @@ replacements. See [Before production](#before-production).
 | `npm run format:check`                       | Verified   | all files pass                                        |
 | `npm run lint`                               | Verified   | no problems                                           |
 | `npm run typecheck`                          | Verified   | no errors                                             |
-| `npm test` (unit)                            | Verified   | 47 files, 482 tests passed                            |
-| `npm run test:db` (database)                 | Verified   | 16 files, 291 tests passed                            |
+| `npm test` (unit)                            | Verified   | 51 files, 538 tests passed (2026-11-15)               |
+| `npm run test:db` (database)                 | Verified   | 17 files, 311 tests passed (2026-11-15)               |
 | `npm run build` (production)                 | Verified   | compiled; 44 pages generated                          |
-| `npm run test:e2e` (Edge, desktop and phone) | Verified   | 100 of 100 passed on the final build (18.9 min)       |
+| `npm run test:e2e` (Edge, desktop and phone) | Verified   | 108 of 108 passed on the final build (2026-11-15)     |
 | Workflows A–G executed                       | Verified   | [testing.md](testing.md#end-to-end-tests)             |
 | Test coverage measured                       | Not tested | no coverage tool installed ([testing.md](testing.md)) |
 | CI pipeline                                  | Not tested | none in the repository                                |

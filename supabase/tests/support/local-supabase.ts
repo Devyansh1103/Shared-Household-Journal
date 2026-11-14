@@ -130,7 +130,9 @@ export function psqlAsSuperuser(sql: string): {
       "-d",
       "postgres",
     ],
-    { input: sql, encoding: "utf8" },
+    // A stalled `docker exec` would otherwise freeze the test worker: fail
+    // after a minute instead.
+    { input: sql, encoding: "utf8", timeout: 60_000 },
   );
   if (result.error) throw result.error;
   return {
